@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "project-orchestrator": {
+      "source": "MarcRoviraP/skills",
+      "sourceType": "github",
+      "computedHash": "62833f5616f35272126907a6bbde4606bb1d9011e3c0b24dbf7fb99e17e0915f"
+    }
+  }
+}

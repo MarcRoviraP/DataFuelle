@@ -1,0 +1,27 @@
+# Task List: Gasolineras Web App
+
+- [x] Project Initialization
+  - [x] Set up Vite + React + TypeScript project
+  - [x] Install dependencies (TailwindCSS, Leaflet, React-Leaflet, Zustand/Context, Lucide Icons)
+  - [x] Configure TailwindCSS
+- [x] Data Layer & API
+  - [x] Create API service for `api.precioil.es`
+  - [x] Implement data normalization (types, numbers)
+  - [x] Haversine distance calculation utility
+- [x] State Management
+  - [x] Set up global state for filters (fuel type, price range, distance)
+  - [x] Set up state for current location and search history
+- [x] UI Components
+  - [x] Layout (Sidebar + Main Content + Map)
+  - [x] Sidebar: Search inputs (Geolocation, Municipio, CP)
+  - [x] Sidebar: Filters (Fuel Type dropdown, Price Range, Distance Slider, Brand)
+  - [x] Main: Gas Station Card (Name, Price, Distance, Brand)
+  - [x] Main: Station List with sorting (Price, Distance)
+  - [x] Map: Leaflet integration with markers and tooltips
+- [x] Advanced Features
+  - [x] Recent price changes highlighting (API integrated)
+  - [x] LocalStorage implementation for history
+- [x] Polish & Optimization
+  - [x] Loading skeletons
+  - [x] Debounce inputs (handled via manual search button for better UX with API)
+  - [x] Responsive design adjustments (Layout structure ready)
