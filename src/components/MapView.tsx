@@ -1,4 +1,6 @@
-import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents, LayersControl } from 'react-leaflet'
+
+const { BaseLayer } = LayersControl
 import { useAppStore } from '../store/useAppStore'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -136,10 +138,20 @@ export const MapView = () => {
         zoom={13}
         className="w-full h-full"
       >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+        <LayersControl position="topright">
+          <BaseLayer checked name="Mapa">
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+          </BaseLayer>
+          <BaseLayer name="Satélite">
+            <TileLayer
+              attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EBP, and the GIS User Community'
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+            />
+          </BaseLayer>
+        </LayersControl>
         <MapController center={currentLocation} />
         <MapEvents />
         <MarkerOpener stationId={selectedStationId} markerRefs={markerRefs} />
