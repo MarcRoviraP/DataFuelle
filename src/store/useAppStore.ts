@@ -39,12 +39,17 @@ interface AppState {
   // Selected station (shared between list and map)
   selectedStationId: number | null
   setSelectedStationId: (id: number | null) => void
+  // UI State
+  isSidebarOpen: boolean
+  setIsSidebarOpen: (isOpen: boolean) => void
 
   // Actions
   updateFilteredStations: () => void
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
+  isSidebarOpen: false,
+  setIsSidebarOpen: (isOpen) => set({ isSidebarOpen: isOpen }),
   currentLocation: { lat: 39.4699, lon: -0.3763 }, // Default to Valencia
   setCurrentLocation: (lat, lon) => set({ currentLocation: { lat, lon } }),
 
