@@ -74,7 +74,7 @@ export const fetchStationsByRadius = async (
 
   return data.map((s: any) => ({
     ...s,
-    precioCombustible: s[key] || s.Diesel || s.Gasolina95 || 0,
+    precioCombustible: s[key] || 0,
     precioG95: s['Gasolina95'] || null,
     precioG98: s['Gasolina98'] || null,
     precioDiesel: s['Diesel'] || null,

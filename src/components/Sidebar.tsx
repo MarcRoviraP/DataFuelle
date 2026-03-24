@@ -4,7 +4,11 @@ import { fetchStationsByRadius } from '../services/api'
 import { geocodeAddress } from '../utils/geo'
 import { Search, MapPin, Fuel, Navigation, History, Filter } from 'lucide-react'
 
-export const Sidebar = () => {
+interface SidebarProps {
+  setIsOpen?: (open: boolean) => void
+}
+
+export const Sidebar = ({ setIsOpen }: SidebarProps) => {
   const {
     currentLocation,
     setCurrentLocation,
@@ -71,8 +75,11 @@ export const Sidebar = () => {
       )
       console.log('[Search Result] Success:', data)
       setStations(data)
-      // updateFilteredStations() is already called by setStations inside useAppStore
       if (query) addToHistory(query)
+      // Close sidebar on mobile after search
+      if (window.innerWidth < 768) {
+        setIsOpen?.(false)
+      }
     } catch (error) {
       console.error('[Search Result] Error:', error)
       alert(`Error en la búsqueda: ${error instanceof Error ? error.message : 'Error desconocido'}`)
@@ -106,11 +113,11 @@ export const Sidebar = () => {
   }
 
   return (
-    <aside className="w-[380px] h-full bg-white flex flex-col shadow-2xl z-20 overflow-hidden custom-scrollbar">
+    <aside className="w-[300px] md:w-[380px] max-w-[90vw] h-full bg-white flex flex-col shadow-2xl z-20 overflow-hidden custom-scrollbar">
       <div className="p-6 bg-blue-600 text-white shrink-0">
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <Fuel size={28} className="text-blue-200" />
-          GasolinerasApp
+          DataFuelle
         </h1>
         <p className="text-blue-100/70 text-sm mt-1">Busca el mejor precio cerca de ti</p>
       </div>

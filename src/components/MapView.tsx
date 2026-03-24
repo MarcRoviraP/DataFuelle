@@ -84,6 +84,44 @@ export const MapView = () => {
   const defaultCenter: [number, number] = [39.4699, -0.3763]
   const markerRefs = useRef<Map<number, L.Marker>>(new Map())
 
+  // Calculate average price for dynamic coloring
+  const prices = filteredStations.map(s => s.precioCombustible).filter(p => p > 0)
+  const averagePrice = prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : 0
+
+  const getPriceIcon = (price: number, isSelected: boolean) => {
+    let color = '#64748b' // Default slate
+    
+    if (price > 0 && averagePrice > 0) {
+      if (price < averagePrice * 0.98) color = '#16a34a' // Green (Cheap)
+      else if (price > averagePrice * 1.02) color = '#dc2626' // Red (Expensive)
+      else color = '#d97706' // Orange (Average)
+    }
+
+    return L.divIcon({
+      className: '',
+      html: `
+        <div style="
+          background: ${isSelected ? '#2563eb' : color};
+          color: white;
+          padding: 3px 7px;
+          border-radius: 6px;
+          font-weight: 800;
+          font-size: 11px;
+          box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+          border: 2px solid ${isSelected ? '#fff' : 'transparent'};
+          transform: ${isSelected ? 'scale(1.15)' : 'scale(1)'};
+          transition: all 0.2s;
+          white-space: nowrap;
+          pointer-events: none;
+        ">
+          ${price.toFixed(3)}€
+        </div>
+      `,
+      iconSize: [50, 24],
+      iconAnchor: [25, 12],
+    })
+  }
+
   // Fuel badge config
   const fuels = [
     { id: 9,  label: 'G 95',   key: 'precioG95'    as const, color: '#16a34a' },
@@ -120,9 +158,13 @@ export const MapView = () => {
           <Marker
             key={station.idEstacion}
             position={[station.latitud, station.longitud]}
+            icon={getPriceIcon(station.precioCombustible, selectedStationId === station.idEstacion)}
             ref={(ref) => {
               if (ref) markerRefs.current.set(station.idEstacion, ref)
               else markerRefs.current.delete(station.idEstacion)
+            }}
+            eventHandlers={{
+              click: () => useAppStore.getState().setSelectedStationId(station.idEstacion)
             }}
           >
             <Popup minWidth={200}>
@@ -170,10 +212,33 @@ export const MapView = () => {
                   })}
                 </div>
 
-                <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.5 }}>
+                <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.5, marginBottom: 10 }}>
                   <p>{station.direccion}</p>
                   <p>{station.horario}</p>
                 </div>
+
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${station.latitud},${station.longitud}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    width: '100%',
+                    padding: '8px',
+                    background: '#2563eb',
+                    color: 'white',
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                    boxShadow: '0 2px 4px rgba(37,99,235,0.2)'
+                  }}
+                >
+                  Fijar ruta en Google Maps
+                </a>
               </div>
             </Popup>
           </Marker>

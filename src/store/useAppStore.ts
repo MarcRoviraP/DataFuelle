@@ -121,7 +121,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   updateFilteredStations: () => {
     const { stations, radius, selectedBrands, sortBy, showOnlyOpen } = get()
     
-    let filtered = stations.filter(s => (s.distancia || 0) <= radius)
+    let filtered = stations.filter(s => (s.distancia || 0) <= radius && (s.precioCombustible || 0) > 0)
 
     // Filter by Brand
     if (selectedBrands.length > 0) {
