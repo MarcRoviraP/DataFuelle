@@ -16,6 +16,9 @@ export interface Station {
   provincia: string
   marca: string
   precioCombustible: number
+  precioG95: number | null
+  precioG98: number | null
+  precioDiesel: number | null
   distancia?: number
 }
 
@@ -51,7 +54,6 @@ export const fetchStationsByRadius = async (
   const data = await response.json()
   console.log(`[API Success] Found ${data.length} stations`)
 
-  // Normalize data: pick the correct price based on requested fuel type
   const fuelKeyMap: Record<number, string> = {
     1: 'Biodiesel',
     2: 'Bioetanol',
@@ -72,8 +74,10 @@ export const fetchStationsByRadius = async (
 
   return data.map((s: any) => ({
     ...s,
-    // Try primary key, then fallbacks if needed
     precioCombustible: s[key] || s.Diesel || s.Gasolina95 || 0,
+    precioG95: s['Gasolina95'] || null,
+    precioG98: s['Gasolina98'] || null,
+    precioDiesel: s['Diesel'] || null,
   }))
 }
 

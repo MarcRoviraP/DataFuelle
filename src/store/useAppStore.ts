@@ -36,6 +36,10 @@ interface AppState {
   addToHistory: (query: string) => void
   clearHistory: () => void
 
+  // Selected station (shared between list and map)
+  selectedStationId: number | null
+  setSelectedStationId: (id: number | null) => void
+
   // Actions
   updateFilteredStations: () => void
 }
@@ -50,7 +54,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     get().updateFilteredStations()
   },
 
-  selectedFuelTypeId: 6, // Default to Gasoleo A (Normal Diesel)
+  selectedFuelTypeId: 9, // Default to Gasolina 95
   setSelectedFuelTypeId: (id) => {
     set({ selectedFuelTypeId: id })
     get().updateFilteredStations()
@@ -72,7 +76,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     get().updateFilteredStations()
   },
 
-  fuelTypes: [],
+  fuelTypes: [
+    { idFuelType: 9, fuelTypeName: 'Gasolina 95' },
+    { idFuelType: 12, fuelTypeName: 'Gasolina 98' },
+    { idFuelType: 6, fuelTypeName: 'Diesel' },
+  ],
   setFuelTypes: (types) => set({ fuelTypes: types }),
 
   stations: [],
@@ -91,6 +99,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   filteredStations: [],
   setFilteredStations: (stations) => set({ filteredStations: stations }),
+
+  selectedStationId: null,
+  setSelectedStationId: (id) => set({ selectedStationId: id }),
 
   isLoading: false,
   setIsLoading: (isLoading) => set({ isLoading }),

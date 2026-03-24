@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useAppStore } from '../store/useAppStore'
-import { fetchFuelTypes, fetchStationsByRadius } from '../services/api'
+import { fetchStationsByRadius } from '../services/api'
 import { geocodeAddress } from '../utils/geo'
 import { Search, MapPin, Fuel, Navigation, History, Filter } from 'lucide-react'
 
@@ -13,7 +13,6 @@ export const Sidebar = () => {
     selectedFuelTypeId,
     setSelectedFuelTypeId,
     fuelTypes,
-    setFuelTypes,
     setStations,
     searchHistory,
     addToHistory,
@@ -28,17 +27,6 @@ export const Sidebar = () => {
 
   const [searchQuery, setSearchQuery] = useState('')
 
-  useEffect(() => {
-    const loadFuelTypes = async () => {
-      try {
-        const types = await fetchFuelTypes()
-        setFuelTypes(types)
-      } catch (error) {
-        console.error('Error loading fuel types:', error)
-      }
-    }
-    loadFuelTypes()
-  }, [])
 
   const handleSearch = async (overrideQuery?: string) => {
     const query = overrideQuery ?? searchQuery;

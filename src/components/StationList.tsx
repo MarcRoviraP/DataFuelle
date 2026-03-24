@@ -1,11 +1,9 @@
 import { useAppStore } from '../store/useAppStore'
 import { StationCard } from './StationCard'
-import { useState } from 'react'
 import { LoadingSkeleton } from './LoadingSkeleton'
 
 export const StationList = () => {
-  const { filteredStations, isLoading } = useAppStore()
-  const [selectedStationId, setSelectedStationId] = useState<number | null>(null)
+  const { filteredStations, isLoading, selectedStationId, setSelectedStationId } = useAppStore()
 
   if (isLoading) {
     return <LoadingSkeleton />
