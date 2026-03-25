@@ -35,6 +35,18 @@ export const fetchFuelTypes = async (): Promise<FuelType[]> => {
   return response.json()
 }
 
+const cleanStationName = (name: string) => {
+  if (!name) return ''
+  // Replace + and _ with space, collapse multiple spaces
+  const cleaned = name.replace(/[+_]/g, ' ').replace(/\s+/g, ' ').trim()
+  // Title Case
+  return cleaned
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
+
 export const fetchStationsByRadius = async (
   latitud: number,
   longitud: number,
@@ -79,6 +91,7 @@ export const fetchStationsByRadius = async (
 
   return data.map((s: any) => ({
     ...s,
+    nombreEstacion: cleanStationName(s.nombreEstacion || s.rotulo || s.marca || 'Estación sin nombre'),
     precioCombustible: s[key] || 0,
     precioG95: s['Gasolina95'] || null,
     precioG98: s['Gasolina98'] || null,

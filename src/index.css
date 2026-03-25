@@ -56,3 +56,8 @@
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* Push Leaflet's zoom control up so our custom LocateMe button sits below it */
+.leaflet-bottom.leaflet-right .leaflet-control-zoom {
+  margin-bottom: 90px !important;
+}

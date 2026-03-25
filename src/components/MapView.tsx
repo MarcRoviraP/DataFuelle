@@ -1,4 +1,4 @@
-import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents, LayersControl } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents, LayersControl, ZoomControl } from 'react-leaflet'
 
 const { BaseLayer } = LayersControl
 import { useAppStore } from '../store/useAppStore'
@@ -192,7 +192,9 @@ export const MapView = () => {
         zoom={13}
         className="w-full h-full"
         attributionControl={false}
+        zoomControl={false}
       >
+        <ZoomControl position="bottomright" />
         <LayersControl position="topright">
           <BaseLayer checked name="Mapa">
             <TileLayer
@@ -238,7 +240,7 @@ export const MapView = () => {
             <Popup minWidth={200}>
               <div style={{ padding: '4px 2px', minWidth: 200 }}>
                 <h4 style={{
-                  fontWeight: 800, fontSize: 13, color: '#0f172a',
+                  fontWeight: 600, fontSize: 13, color: '#0f172a',
                   borderBottom: '1px solid #e2e8f0', paddingBottom: 6, marginBottom: 8
                 }}>
                   {station.nombreEstacion}

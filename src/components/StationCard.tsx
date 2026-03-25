@@ -33,7 +33,7 @@ export const StationCard = ({ station, isSelected, onClick }: StationCardProps) 
       onClick={onClick}
     >
       <div className="flex justify-between items-start mb-2 group">
-        <h3 className="font-bold text-gray-900 leading-tight flex-1 pr-2">{station.nombreEstacion}</h3>
+        <h3 className="font-semibold text-gray-900 leading-tight flex-1 pr-2">{station.nombreEstacion}</h3>
         <div className="flex flex-col items-end">
           <div className="flex items-baseline gap-1.5 flex-wrap justify-end">
             {currentDiscount > 0 && station.precioBase && (
