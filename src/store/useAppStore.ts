@@ -45,7 +45,7 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
-  currentLocation: { lat: 39.4699, lon: -0.3763 }, // Default to Valencia
+  currentLocation: null, // Default to null, will fetch user location on startup
   setCurrentLocation: (lat, lon) => set({ currentLocation: { lat, lon } }),
 
   radius: 40,

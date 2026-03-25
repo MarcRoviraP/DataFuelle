@@ -1,11 +1,32 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Sidebar } from './components/Sidebar'
 import { StationList } from './components/StationList'
 import { MapView } from './components/MapView'
 import { Filter, X } from 'lucide-react'
+import { useAppStore } from './store/useAppStore'
 
 function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const setCurrentLocation = useAppStore(state => state.setCurrentLocation)
+
+  useEffect(() => {
+    // Try to get user's location on mount
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setCurrentLocation(position.coords.latitude, position.coords.longitude)
+        },
+        (error) => {
+          console.error('Error getting location:', error)
+          // Fallback to Valencia if denied or fails
+          setCurrentLocation(39.4699, -0.3763)
+        }
+      )
+    } else {
+      // Fallback if not supported
+      setCurrentLocation(39.4699, -0.3763)
+    }
+  }, [setCurrentLocation])
 
   return (
     <div className="flex flex-col md:flex-row h-screen w-screen bg-slate-100 overflow-hidden font-sans text-slate-800 antialiased">

@@ -1,10 +1,15 @@
 {
   "version": 1,
   "skills": {
+    "agente-context-logger": {
+      "source": "MarcRoviraP/skills",
+      "sourceType": "github",
+      "computedHash": "a53d59309db28d7f42702253c65735d0ecf80a7eb9a373fab9fc2b4a9d997b26"
+    },
     "project-orchestrator": {
       "source": "MarcRoviraP/skills",
       "sourceType": "github",
-      "computedHash": "62833f5616f35272126907a6bbde4606bb1d9011e3c0b24dbf7fb99e17e0915f"
+      "computedHash": "ba8e8bda25064339fa71c890b2d2fbabe9dd4cad64dd293a883ab0e65273ca96"
     }
   }
 }

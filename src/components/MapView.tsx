@@ -2,7 +2,8 @@ import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 're
 import { useAppStore } from '../store/useAppStore'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
+import { LocateFixed } from 'lucide-react'
 
 // Fix generic Leaflet icon issue
 import markerIcon from 'leaflet/dist/images/marker-icon.png'
@@ -76,6 +77,53 @@ const MarkerOpener = ({
   return null
 }
 
+const LocateMeButton = () => {
+  const map = useMap()
+  const { currentLocation, setCurrentLocation } = useAppStore()
+  const buttonRef = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    if (buttonRef.current) {
+      L.DomEvent.disableClickPropagation(buttonRef.current)
+      L.DomEvent.disableScrollPropagation(buttonRef.current)
+    }
+  }, [])
+
+  const handleLocate = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    
+    if (currentLocation) {
+      map.setView([currentLocation.lat, currentLocation.lon], 15)
+    } else if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        const { latitude, longitude } = pos.coords
+        setCurrentLocation(latitude, longitude)
+        map.setView([latitude, longitude], 15)
+      })
+    }
+  }
+
+  return (
+    <div 
+      ref={buttonRef}
+      className="leaflet-bottom leaflet-right" 
+      style={{ marginBottom: '30px', marginRight: '10px', pointerEvents: 'auto', zIndex: 1000 }}
+    >
+      <div className="leaflet-control">
+        <button
+          onClick={handleLocate}
+          className="bg-white hover:bg-slate-50 text-blue-600 p-2.5 rounded-xl shadow-2xl border-2 border-white transition-all active:scale-90 flex items-center justify-center group/btn"
+          title="Mi ubicación"
+          style={{ width: '46px', height: '46px' }}
+        >
+          <LocateFixed size={24} className="group-hover/btn:scale-110 transition-transform" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
 const fmt = (v: number | null | undefined) =>
   v && v > 0 ? `${v.toFixed(3)} €/L` : '—'
 
@@ -142,6 +190,7 @@ export const MapView = () => {
         />
         <MapController center={currentLocation} />
         <MapEvents />
+        <LocateMeButton />
         <MarkerOpener stationId={selectedStationId} markerRefs={markerRefs} />
 
         {currentLocation && (

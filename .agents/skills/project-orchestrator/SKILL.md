@@ -14,6 +14,11 @@ Use this skill when:
 
 ## Instructions
 
+### 0. Context Retrieval (Crucial)
+- **Check for Logs**: Look for a `logs_md_agente` directory in the current project root.
+- **Read History**: If it exists, list and read the most recent markdown log files. These logs contain critical context from previous agents/sessions.
+- **Resume Work**: Prioritize following the "Recommendations for the Next Agent" and "Pending Work" found in those logs.
+
 ### 1. Documentation
 - Analyze project changes
 - Generate or update README.md
@@ -32,9 +37,9 @@ Use this skill when:
 - Use Stitch MCP to generate UI
 - Create reusable components
 
-### 5. Logging
-- Log all actions performed
-- Use levels: info, warning, error
+### 5. Logging & History
+- Log all actions performed using levels (info, warning, error).
+- **Session Finalization**: Before concluding, use the `agente-context-logger` skill to create a summary in `logs_md_agente`, documenting the session's work and next steps.
 
 ## Constraints
 - Do not overwrite existing configs without confirmation
