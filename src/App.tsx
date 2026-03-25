@@ -3,10 +3,18 @@ import { Sidebar } from './components/Sidebar'
 import { StationList } from './components/StationList'
 import { MapView } from './components/MapView'
 import { useAppStore } from './store/useAppStore'
-import { Filter, X } from 'lucide-react'
+import { X, Map as MapIcon, List, Settings } from 'lucide-react'
 
 function App() {
-  const { isSidebarOpen, setIsSidebarOpen, setCurrentLocation, selectedFuelTypeId, fuelTypes } = useAppStore()
+  const { 
+    isSidebarOpen, 
+    setIsSidebarOpen, 
+    setCurrentLocation, 
+    selectedFuelTypeId, 
+    fuelTypes,
+    viewMode,
+    setViewMode
+  } = useAppStore()
   const selectedFuelName = fuelTypes.find(f => f.idFuelType === selectedFuelTypeId)?.fuelTypeName || 'Combustible'
 
   useEffect(() => {
@@ -31,7 +39,7 @@ function App() {
   return (
     <div className="flex h-screen w-screen bg-slate-100 overflow-hidden font-sans text-slate-800 antialiased relative">
       
-      {/* Sidebar Overlay for Mobile / Sidebar for Desktop */}
+      {/* Filters Drawer (Mobile) / Sidebar (Desktop) */}
       <div className={`fixed inset-0 z-[2000] lg:relative lg:z-10 transition-transform duration-300 transform ${
         isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
       }`}>
@@ -39,37 +47,29 @@ function App() {
           className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm lg:hidden shadow-2xl" 
           onClick={() => setIsSidebarOpen(false)}
         />
-        <div className="relative h-full flex shrink-0 w-[320px] sm:w-[380px] lg:w-auto shadow-2xl lg:shadow-none bg-white">
+        <div className="relative h-full flex shrink-0 w-[300px] sm:w-[380px] lg:w-auto shadow-2xl lg:shadow-none bg-white">
           <Sidebar />
-          {/* Close button for mobile sidebar */}
           <button 
             onClick={() => setIsSidebarOpen(false)}
-            className="lg:hidden absolute top-4 right-4 p-2 bg-white/20 hover:bg-white/40 text-white rounded-full"
+            className="lg:hidden absolute top-4 right-4 p-2.5 bg-blue-700/80 hover:bg-blue-800 text-white rounded-xl shadow-lg transition-all active:scale-95"
           >
-            <X size={24} />
+            <X size={20} />
           </button>
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <main className="flex-1 flex overflow-hidden relative overflow-y-auto lg:overflow-hidden lg:flex-row">
-        
-        {/* Floating Toggle Button for Mobile - Placed on the map with high z-index */}
-        <button 
-          onClick={() => setIsSidebarOpen(true)}
-          className="lg:hidden fixed bottom-8 right-6 z-[1001] bg-blue-600 text-white p-4 rounded-full shadow-2xl hover:bg-blue-700 active:scale-95 transition-all flex items-center gap-2 font-bold ring-4 ring-blue-100"
-        >
-          <Filter size={24} />
-          <span className="text-sm">Filtros</span>
-        </button>
-
-        {/* Results List - Hidden on small screens as per goal to prioritize the map */}
-        <section className="hidden xl:flex w-[450px] h-full shrink-0 flex-col border-r border-slate-200 bg-white">
+      <main className="flex-1 flex flex-col xl:flex-row overflow-hidden relative">
+        {/* Results List - Visible on XL or if explicitly selected on mobile */}
+        <section className={`flex-1 xl:w-[450px] xl:shrink-0 xl:flex h-full flex-col border-r border-slate-200 bg-white ${
+          viewMode === 'list' ? 'flex' : 'hidden xl:flex'
+        }`}>
           <StationList />
         </section>
 
-        {/* Map View */}
-        <section className="flex-1 h-full shadow-inner relative">
+        {/* Map View - Full screen on mobile unless List is active, or persistent on XL */}
+        <section className={`flex-1 h-full shadow-inner relative ${
+          viewMode === 'map' ? 'flex' : 'hidden xl:flex'
+        }`}>
           <MapView />
           
           <div className="absolute top-4 left-4 md:top-6 md:left-6 z-[400] bg-white/80 backdrop-blur-md px-4 md:px-6 py-2 md:py-2.5 rounded-full shadow-2xl border border-white/50 pointer-events-none">
@@ -79,6 +79,39 @@ function App() {
             </p>
           </div>
         </section>
+
+        {/* Bottom Navigation for Mobile */}
+        <nav className="xl:hidden h-20 bg-white border-t border-slate-200 flex items-center justify-around px-4 pb-2 pt-2 z-[1001] shadow-[0_-5px_20px_-10px_rgba(0,0,0,0.1)]">
+          <button 
+            onClick={() => setViewMode('map')}
+            className={`flex flex-col items-center gap-1.5 px-6 py-2 rounded-2xl transition-all ${
+              viewMode === 'map' ? 'text-blue-600 bg-blue-50' : 'text-slate-400'
+            }`}
+          >
+            <MapIcon size={20} />
+            <span className="text-[10px] font-bold uppercase tracking-widest">Mapa</span>
+          </button>
+          
+          <button 
+            onClick={() => setViewMode('list')}
+            className={`flex flex-col items-center gap-1.5 px-6 py-2 rounded-2xl transition-all ${
+              viewMode === 'list' ? 'text-blue-600 bg-blue-50' : 'text-slate-400'
+            }`}
+          >
+            <List size={20} />
+            <span className="text-[10px] font-bold uppercase tracking-widest">Lista</span>
+          </button>
+
+          <button 
+            onClick={() => setIsSidebarOpen(true)}
+            className={`flex flex-col items-center gap-1.5 px-6 py-2 rounded-2xl transition-all ${
+              isSidebarOpen ? 'text-blue-600 bg-blue-50' : 'text-slate-400'
+            }`}
+          >
+            <Settings size={20} />
+            <span className="text-[10px] font-bold uppercase tracking-widest">Filtros</span>
+          </button>
+        </nav>
       </main>
     </div>
   )

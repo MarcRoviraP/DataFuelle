@@ -48,6 +48,9 @@ interface AppState {
   // Discounts per station
   stationDiscounts: Map<number, number>
   setStationDiscount: (stationId: number, discount: number) => void
+  // Tab/View Mode for Mobile
+  viewMode: 'map' | 'list'
+  setViewMode: (mode: 'map' | 'list') => void
 
   // Actions
   updateFilteredStations: () => void
@@ -56,6 +59,8 @@ interface AppState {
 export const useAppStore = create<AppState>((set, get) => ({
   isSidebarOpen: false,
   setIsSidebarOpen: (isOpen) => set({ isSidebarOpen: isOpen }),
+  viewMode: 'map',
+  setViewMode: (mode) => set({ viewMode: mode }),
   currentLocation: null, // Default to null, will fetch user location on startup
   setCurrentLocation: (lat, lon) => set({ currentLocation: { lat, lon } }),
   stationDiscounts: new Map(JSON.parse(localStorage.getItem('stationDiscounts') || '[]')),
