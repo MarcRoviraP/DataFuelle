@@ -4,11 +4,7 @@ import { fetchStationsByRadius } from '../services/api'
 import { geocodeAddress } from '../utils/geo'
 import { Search, MapPin, Fuel, Navigation, History, Filter } from 'lucide-react'
 
-interface SidebarProps {
-  setIsOpen?: (open: boolean) => void
-}
-
-export const Sidebar = ({ setIsOpen }: SidebarProps) => {
+export const Sidebar = () => {
   const {
     currentLocation,
     setCurrentLocation,
@@ -27,6 +23,7 @@ export const Sidebar = ({ setIsOpen }: SidebarProps) => {
     setSortBy,
     showOnlyOpen,
     setShowOnlyOpen,
+    setIsSidebarOpen,
   } = useAppStore()
 
   const [searchQuery, setSearchQuery] = useState('')
@@ -77,8 +74,8 @@ export const Sidebar = ({ setIsOpen }: SidebarProps) => {
       setStations(data)
       if (query) addToHistory(query)
       // Close sidebar on mobile after search
-      if (window.innerWidth < 768) {
-        setIsOpen?.(false)
+      if (window.innerWidth < 1024) {
+        setIsSidebarOpen(false)
       }
     } catch (error) {
       console.error('[Search Result] Error:', error)
