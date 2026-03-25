@@ -45,6 +45,9 @@ interface AppState {
   // Price changes data
   priceChanges: Map<number, any>
   setPriceChanges: (changes: any[]) => void
+  // Discounts per station
+  stationDiscounts: Map<number, number>
+  setStationDiscount: (stationId: number, discount: number) => void
 
   // Actions
   updateFilteredStations: () => void
@@ -55,6 +58,18 @@ export const useAppStore = create<AppState>((set, get) => ({
   setIsSidebarOpen: (isOpen) => set({ isSidebarOpen: isOpen }),
   currentLocation: null, // Default to null, will fetch user location on startup
   setCurrentLocation: (lat, lon) => set({ currentLocation: { lat, lon } }),
+  stationDiscounts: new Map(JSON.parse(localStorage.getItem('stationDiscounts') || '[]')),
+  setStationDiscount: (stationId, discount) => {
+    const discounts = new Map(get().stationDiscounts)
+    if (discount <= 0) {
+      discounts.delete(stationId)
+    } else {
+      discounts.set(stationId, discount)
+    }
+    localStorage.setItem('stationDiscounts', JSON.stringify(Array.from(discounts.entries())))
+    set({ stationDiscounts: discounts })
+    get().updateFilteredStations()
+  },
 
   radius: 40,
   setRadius: (radius) => {
@@ -106,15 +121,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     const changes = get().priceChanges
     const stationsWithChanges = stationsWithDist.map(s => {
       const change = changes.get(s.idEstacion)
-      if (change) {
-        return { 
-          ...s, 
-          diff: parseFloat(change.diferencia),
-          delta_pct: parseFloat(change.delta_pct),
-          precioAnterior: parseFloat(change.precioAnterior)
-        }
+      return { 
+        ...s, 
+        precioBase: s.precioCombustible,
+        diff: change ? parseFloat(change.diferencia) : undefined,
+        delta_pct: change ? parseFloat(change.delta_pct) : undefined,
+        precioAnterior: change ? parseFloat(change.precioAnterior) : undefined
       }
-      return s
     })
 
     set({ stations: stationsWithChanges })
@@ -173,9 +186,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   updateFilteredStations: () => {
-    const { stations, radius, selectedBrands, sortBy, showOnlyOpen } = get()
+    const { stations, radius, selectedBrands, sortBy, showOnlyOpen, stationDiscounts } = get()
     
-    let filtered = stations.filter(s => (s.distancia || 0) <= radius && (s.precioCombustible || 0) > 0)
+    let filtered = stations.map(s => ({
+      ...s,
+      precioCombustible: (s.precioBase || 0) - (stationDiscounts.get(s.idEstacion) || 0)
+    })).filter(s => (s.distancia || 0) <= radius && (s.precioBase || 0) > 0)
 
     // Filter by Brand
     if (selectedBrands.length > 0) {

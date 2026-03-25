@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAppStore } from '../store/useAppStore'
 import { fetchStationsByRadius, fetchRecentPriceChanges } from '../services/api'
 import { geocodeAddress } from '../utils/geo'
@@ -28,6 +28,13 @@ export const Sidebar = () => {
   } = useAppStore()
 
   const [searchQuery, setSearchQuery] = useState('')
+
+  // Auto-fetch on mount/location change if no stations yet
+  useEffect(() => {
+    if (currentLocation && stations.length === 0 && !isLoading) {
+      handleSearch()
+    }
+  }, [currentLocation])
 
 
   const handleSearch = async (overrideQuery?: string) => {
@@ -78,6 +85,7 @@ export const Sidebar = () => {
       console.log('[Search Result] Success:', data)
       useAppStore.getState().setPriceChanges(priceChanges)
       setStations(data)
+      setSearchQuery('')
       if (query) addToHistory(query)
       // Close sidebar on mobile after search
       if (window.innerWidth < 1024) {
@@ -117,15 +125,38 @@ export const Sidebar = () => {
 
   const handleFuelChange = async (id: number) => {
     setSelectedFuelTypeId(id)
-    
-    // Also re-fetch changes for this fuel type if we have stations
-    if (stations.length > 0) {
+    if (stations.length > 0 && currentLocation) {
+      useAppStore.getState().setIsLoading(true)
       try {
-        const changes = await fetchRecentPriceChanges(id)
-        useAppStore.getState().setPriceChanges(changes)
+        const [data, priceChanges] = await Promise.all([
+          fetchStationsByRadius(currentLocation.lat, currentLocation.lon, radius, id),
+          fetchRecentPriceChanges(id)
+        ])
+        useAppStore.getState().setPriceChanges(priceChanges)
+        setStations(data)
       } catch (e) {
-        console.error('Error fetching changes for new fuel type:', e)
-        useAppStore.getState().setPriceChanges([])
+        console.error('Error fetching data for new fuel type:', e)
+      } finally {
+        useAppStore.getState().setIsLoading(false)
+      }
+    }
+  }
+
+  const handleRadiusChange = async (r: number) => {
+    setRadius(r)
+    if (stations.length > 0 && currentLocation) {
+      useAppStore.getState().setIsLoading(true)
+      try {
+        const [data, priceChanges] = await Promise.all([
+          fetchStationsByRadius(currentLocation.lat, currentLocation.lon, r, selectedFuelTypeId),
+          fetchRecentPriceChanges(selectedFuelTypeId)
+        ])
+        useAppStore.getState().setPriceChanges(priceChanges)
+        setStations(data)
+      } catch (e) {
+        console.error('Error fetching data for new radius:', e)
+      } finally {
+        useAppStore.getState().setIsLoading(false)
       }
     }
   }
@@ -157,20 +188,35 @@ export const Sidebar = () => {
               Usar mi ubicación
             </button>
 
-            <div className="relative group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={18} />
+            <form 
+              onSubmit={(e) => { e.preventDefault(); handleSearch(); }}
+              className="relative group focus-within:ring-2 focus-within:ring-blue-100 rounded-xl transition-all"
+            >
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors pointer-events-none">
+                {isLoading ? (
+                  <span className="w-4 h-4 border-2 border-slate-300 border-t-blue-500 rounded-full animate-spin block" />
+                ) : (
+                  <MapPin size={18} />
+                )}
+              </div>
               <input
                 type="text"
-                placeholder="Municipio o CP (Ej: Valencia, 28001)"
-                className="w-full pl-11 pr-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-blue-400 focus:bg-white transition-all text-slate-700 placeholder:text-slate-400 font-medium"
+                placeholder="Municipio o CP (Ej: Valencia)"
+                className="w-full pl-11 pr-12 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white transition-all text-slate-700 placeholder:text-slate-400 font-semibold shadow-sm"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
-            </div>
+              <button
+                type="submit"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:scale-95 transition-all shadow-lg shadow-blue-200"
+                title="Buscar ubicación"
+              >
+                <Search size={18} />
+              </button>
+            </form>
           </div>
         </section>
 
-        {/* Filters Section */}
         <section className="space-y-4 pt-2 border-t border-slate-100">
           <div className="flex items-center gap-2 text-slate-800 font-bold px-1 border-l-4 border-blue-500">
             <Filter size={18} />
@@ -270,7 +316,7 @@ export const Sidebar = () => {
                 step="1"
                 className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600 hover:accent-blue-700 transition-all"
                 value={radius}
-                onChange={(e) => setRadius(Number(e.target.value))}
+                onChange={(e) => handleRadiusChange(Number(e.target.value))}
               />
               <div className="flex justify-between text-[10px] text-slate-400 font-bold px-1">
                 <span>1KM</span>
@@ -305,20 +351,6 @@ export const Sidebar = () => {
         )}
       </div>
 
-      <div className="p-5 bg-slate-50 border-t border-slate-100 shrink-0">
-        <button
-          onClick={() => handleSearch()}
-          disabled={isLoading}
-          className="w-full py-4 bg-blue-600 text-white font-black rounded-xl hover:bg-blue-700 shadow-[0_8px_30px_rgb(37,99,235,0.3)] transition-all flex items-center justify-center gap-3 disabled:opacity-50 active:scale-[0.98] duration-200"
-        >
-          {isLoading ? (
-            <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-          ) : (
-            <Search size={22} />
-          )}
-          BUSCAR AHORA
-        </button>
-      </div>
     </aside>
   )
 }

@@ -16,6 +16,7 @@ export interface Station {
   provincia: string
   marca: string
   precioCombustible: number
+  precioBase?: number
   precioG95: number | null
   precioG98: number | null
   precioDiesel: number | null

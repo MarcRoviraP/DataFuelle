@@ -1,9 +1,19 @@
+import { useEffect } from 'react'
 import { useAppStore } from '../store/useAppStore'
 import { StationCard } from './StationCard'
 import { LoadingSkeleton } from './LoadingSkeleton'
 
 export const StationList = () => {
   const { filteredStations, isLoading, selectedStationId, setSelectedStationId } = useAppStore()
+
+  useEffect(() => {
+    if (selectedStationId) {
+      const element = document.getElementById(`station-${selectedStationId}`)
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }
+  }, [selectedStationId])
 
   if (isLoading) {
     return <LoadingSkeleton />
@@ -34,12 +44,13 @@ export const StationList = () => {
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-3 custom-scrollbar">
         {filteredStations.map((station) => (
-          <StationCard
-            key={station.idEstacion}
-            station={station}
-            isSelected={selectedStationId === station.idEstacion}
-            onClick={() => setSelectedStationId(station.idEstacion)}
-          />
+          <div key={station.idEstacion} id={`station-${station.idEstacion}`}>
+            <StationCard
+              station={station}
+              isSelected={selectedStationId === station.idEstacion}
+              onClick={() => setSelectedStationId(station.idEstacion)}
+            />
+          </div>
         ))}
       </div>
     </div>

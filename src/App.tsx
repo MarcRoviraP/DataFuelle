@@ -6,7 +6,8 @@ import { useAppStore } from './store/useAppStore'
 import { Filter, X } from 'lucide-react'
 
 function App() {
-  const { isSidebarOpen, setIsSidebarOpen, setCurrentLocation } = useAppStore()
+  const { isSidebarOpen, setIsSidebarOpen, setCurrentLocation, selectedFuelTypeId, fuelTypes } = useAppStore()
+  const selectedFuelName = fuelTypes.find(f => f.idFuelType === selectedFuelTypeId)?.fuelTypeName || 'Combustible'
 
   useEffect(() => {
     // Try to get user's location on mount
@@ -74,7 +75,7 @@ function App() {
           <div className="absolute top-4 left-4 md:top-6 md:left-6 z-[400] bg-white/80 backdrop-blur-md px-4 md:px-6 py-2 md:py-2.5 rounded-full shadow-2xl border border-white/50 pointer-events-none">
             <p className="text-[10px] md:text-sm font-black text-slate-700 uppercase tracking-widest flex items-center gap-2 md:gap-3">
               <span className="w-1.5 h-1.5 md:w-2 md:h-2 bg-green-500 rounded-full animate-pulse ring-4 ring-green-100" />
-              Vista del Mapa
+              Precios de {selectedFuelName}
             </p>
           </div>
         </section>

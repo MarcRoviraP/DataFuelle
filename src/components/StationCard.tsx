@@ -1,6 +1,7 @@
 import type { Station } from '../services/api'
-import { MapPin, Clock, Navigation } from 'lucide-react'
+import { MapPin, Clock, Navigation, Tag } from 'lucide-react'
 import { formatDistance } from '../utils/geo'
+import { useAppStore } from '../store/useAppStore'
 
 interface StationCardProps {
   station: Station
@@ -9,6 +10,9 @@ interface StationCardProps {
 }
 
 export const StationCard = ({ station, isSelected, onClick }: StationCardProps) => {
+  const { stationDiscounts, setStationDiscount } = useAppStore()
+  const currentDiscount = stationDiscounts.get(station.idEstacion) || 0
+
   const handleGoogleMaps = (e: React.MouseEvent) => {
     e.stopPropagation()
     const url = `https://www.google.com/maps/dir/?api=1&destination=${station.latitud},${station.longitud}`
@@ -25,7 +29,12 @@ export const StationCard = ({ station, isSelected, onClick }: StationCardProps) 
       <div className="flex justify-between items-start mb-2 group">
         <h3 className="font-bold text-gray-900 leading-tight flex-1 pr-2">{station.nombreEstacion}</h3>
         <div className="flex flex-col items-end">
-          <div className="flex items-baseline gap-1.5">
+          <div className="flex items-baseline gap-1.5 flex-wrap justify-end">
+            {currentDiscount > 0 && station.precioBase && (
+              <span className="text-[10px] font-bold text-slate-400 line-through">
+                {station.precioBase.toFixed(3)}
+              </span>
+            )}
             <span className="text-xl font-black text-blue-600">
               {station.precioCombustible ? `${station.precioCombustible.toFixed(3)}€` : '---'}
             </span>
@@ -36,6 +45,24 @@ export const StationCard = ({ station, isSelected, onClick }: StationCardProps) 
                 {station.diff > 0 ? '+' : ''}{station.diff.toFixed(3)}
               </span>
             )}
+          </div>
+          
+          <div className="flex items-center gap-1 mt-1 justify-end">
+            <div className="flex items-center gap-2 px-2 py-1 bg-green-50 text-green-700 rounded-lg text-[10px] font-extrabold border border-green-100 group-hover:border-green-300 transition-colors">
+              <Tag size={12} />
+              <input 
+                type="number"
+                step="0.01"
+                min="0"
+                max="1.5"
+                placeholder="0.00"
+                value={currentDiscount || ''}
+                onChange={(e) => setStationDiscount(station.idEstacion, parseFloat(e.target.value) || 0)}
+                onClick={(e) => e.stopPropagation()}
+                className="w-10 bg-transparent outline-none focus:ring-0 text-green-700 border-none p-0 h-auto text-[10px] font-black"
+              />
+              <span>€/L</span>
+            </div>
           </div>
         </div>
       </div>
