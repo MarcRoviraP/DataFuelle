@@ -8,11 +8,15 @@ description: Mantiene un historial de sesiones del agente en markdown dentro de 
 ## Purpose
 This skill is designed to bridge the context gap between different sessions or different agents working on the same project. It creates and maintains a human-readable (and agent-readable) log of activities in a dedicated `logs_md_agente` folder.
 
-## When to Trigger
-- **At the start of a session**: To read past logs and catch up on the project state.
-- **After completing a major feature or bug fix**: To document the changes and rationale.
-- **At the end of a session**: To summarize progress and list pending tasks for the next agent.
+## 🚨 WHEN TO TRIGGER (CRITICAL RULE) 🚨
+
+**YOU MUST NOT EXPECT THE USER TO ASK FOR A LOG.** You are strictly required to execute this skill **autonomously** in these situations:
+
+- **IMMEDIATELY AFTER COMPLETING A FEATURE/FIX/DEPLOYMENT**: Before you reply to the user saying "It's done!", you MUST create/update the log file in `logs_md_agente` summarizing what you just did.
+- **At the start of a session**: To read past logs using `view_file` and catch up on the project state.
+- **When switching contexts or ending a session**: To summarize progress and list pending tasks for yourself or the next agent.
 - **When requested by the user**: Specifically when they want a "checkpoint" or "summary" of current progress.
+
 
 ## Implementation Guide
 
@@ -36,6 +40,9 @@ Each log entry should follow this template for consistency:
 
 ## ✅ Completed Tasks
 - [List of accomplishments]
+- 📝 **Modified Files**:
+  - `path/to/file1.ts`: [Brief description of the changes explicitly tying the feature/bug to this file]
+  - `path/to/file2.tsx`: [Brief description of the changes explicitly tying the feature/bug to this file]
 
 ## 🛠️ Technical Decisions & Rationale
 - [Decision 1]: [Why?]
