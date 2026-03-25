@@ -37,7 +37,7 @@ function App() {
   }, [setCurrentLocation])
 
   return (
-    <div className="flex h-screen w-screen bg-slate-100 overflow-hidden font-sans text-slate-800 antialiased relative">
+    <div className="flex h-[100dvh] w-screen bg-slate-100 overflow-hidden font-sans text-slate-800 antialiased relative">
       
       {/* Filters Drawer (Mobile) / Sidebar (Desktop) */}
       <div className={`fixed inset-0 z-[2000] lg:relative lg:z-10 transition-transform duration-300 transform ${
@@ -60,14 +60,14 @@ function App() {
 
       <main className="flex-1 flex flex-col xl:flex-row overflow-hidden relative">
         {/* Results List - Visible on XL or if explicitly selected on mobile */}
-        <section className={`flex-1 xl:w-[450px] xl:shrink-0 xl:flex h-full flex-col border-r border-slate-200 bg-white ${
+        <section className={`flex-1 min-h-0 xl:w-[450px] xl:shrink-0 xl:flex flex-col border-r border-slate-200 bg-white ${
           viewMode === 'list' ? 'flex' : 'hidden xl:flex'
         }`}>
           <StationList />
         </section>
 
         {/* Map View - Full screen on mobile unless List is active, or persistent on XL */}
-        <section className={`flex-1 h-full shadow-inner relative ${
+        <section className={`flex-1 min-h-0 shadow-inner relative ${
           viewMode === 'map' ? 'flex' : 'hidden xl:flex'
         }`}>
           <MapView />

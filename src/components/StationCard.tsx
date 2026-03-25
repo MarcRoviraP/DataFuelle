@@ -9,6 +9,12 @@ interface StationCardProps {
   onClick?: () => void
 }
 
+const fuelTypes = [
+  { key: 'precioG95' as const,    label: 'G95' },
+  { key: 'precioG98' as const,    label: 'G98' },
+  { key: 'precioDiesel' as const, label: 'DSL' },
+]
+
 export const StationCard = ({ station, isSelected, onClick }: StationCardProps) => {
   const { stationDiscounts, setStationDiscount } = useAppStore()
   const currentDiscount = stationDiscounts.get(station.idEstacion) || 0
@@ -46,11 +52,11 @@ export const StationCard = ({ station, isSelected, onClick }: StationCardProps) 
               </span>
             )}
           </div>
-          
+
           <div className="flex items-center gap-1 mt-1 justify-end">
             <div className="flex items-center gap-2 px-2 py-1 bg-green-50 text-green-700 rounded-lg text-[10px] font-extrabold border border-green-100 group-hover:border-green-300 transition-colors">
               <Tag size={12} />
-              <input 
+              <input
                 type="number"
                 step="0.01"
                 min="0"
@@ -61,10 +67,32 @@ export const StationCard = ({ station, isSelected, onClick }: StationCardProps) 
                 onClick={(e) => e.stopPropagation()}
                 className="w-10 bg-transparent outline-none focus:ring-0 text-green-700 border-none p-0 h-auto text-[10px] font-black"
               />
-              <span>€/L</span>
+              <span>Dto. €/L</span>
             </div>
           </div>
         </div>
+      </div>
+
+      {/* All fuel prices with discount applied */}
+      <div className="flex gap-2 mb-3 flex-wrap">
+        {fuelTypes.map(({ key, label }) => {
+          const raw = station[key]
+          if (!raw || raw <= 0) return null
+          const final = currentDiscount > 0 ? raw - currentDiscount : null
+          return (
+            <div key={key} className="flex flex-col items-center bg-slate-50 border border-slate-100 rounded-lg px-2 py-1 min-w-[52px]">
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">{label}</span>
+              {final !== null ? (
+                <>
+                  <span className="text-[9px] text-slate-400 line-through">{raw.toFixed(3)}</span>
+                  <span className="text-[11px] font-black text-blue-600">{final.toFixed(3)}</span>
+                </>
+              ) : (
+                <span className="text-[11px] font-black text-slate-600">{raw.toFixed(3)}</span>
+              )}
+            </div>
+          )
+        })}
       </div>
 
       <div className="space-y-1 text-sm text-gray-500">
@@ -89,7 +117,7 @@ export const StationCard = ({ station, isSelected, onClick }: StationCardProps) 
             </span>
           )}
         </div>
-        
+
         <button
           onClick={handleGoogleMaps}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition-colors shadow-md"

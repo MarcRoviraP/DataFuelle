@@ -39,10 +39,16 @@ const LocationIcon = L.divIcon({
 L.Marker.prototype.options.icon = DefaultIcon
 
 const MapEvents = () => {
-  const setCurrentLocation = useAppStore((state) => state.setCurrentLocation)
   useMapEvents({
     click(e) {
-      setCurrentLocation(e.latlng.lat, e.latlng.lng)
+      const store = useAppStore.getState()
+      if (store.selectedStationId) {
+        // If a card/popup is open, clicking the map just closes it
+        store.setSelectedStationId(null)
+      } else {
+        // Otherwise, move the search center
+        store.setCurrentLocation(e.latlng.lat, e.latlng.lng)
+      }
     },
   })
   return null
@@ -130,7 +136,7 @@ const fmt = (v: number | null | undefined) =>
   v && v > 0 ? `${v.toFixed(3)} €/L` : '—'
 
 export const MapView = () => {
-  const { filteredStations, currentLocation, selectedFuelTypeId, selectedStationId } = useAppStore()
+  const { filteredStations, currentLocation, selectedFuelTypeId, selectedStationId, stationDiscounts } = useAppStore()
   const defaultCenter: [number, number] = [39.4699, -0.3763]
   const markerRefs = useRef<Map<number, L.Marker>>(new Map())
 
@@ -242,7 +248,9 @@ export const MapView = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 8 }}>
                   {fuels.map(({ id, label, key, color }) => {
                     const isActive = selectedFuelTypeId === id
-                    const price = station[key]
+                    const rawPrice = station[key]
+                    const discount = stationDiscounts.get(station.idEstacion) ?? 0
+                    const discountedPrice = rawPrice && discount > 0 ? rawPrice - discount : null
                     return (
                       <div
                         key={id}
@@ -265,22 +273,34 @@ export const MapView = () => {
                         </span>
                         <span style={{
                           fontWeight: 800, fontSize: 13,
-                          color: isActive ? '#fff' : color,
                           display: 'flex',
                           alignItems: 'center',
                           gap: 4
                         }}>
-                          {isActive && station.diff !== undefined && station.diff !== 0 && (
-                            <span style={{ 
-                               fontSize: 10, 
-                               fontWeight: 800,
-                               color: station.diff < 0 ? '#bbf7d0' : '#fecaca',
-                               marginLeft: 4
-                            }}>
-                              {station.diff > 0 ? '+' : ''}{station.diff.toFixed(3)}
+                          {discountedPrice !== null ? (
+                            <>
+                              <span style={{ textDecoration: 'line-through', color: isActive ? 'rgba(255,255,255,0.6)' : '#94a3b8', fontSize: 11 }}>
+                                {fmt(rawPrice)}
+                              </span>
+                              <span style={{ color: isActive ? '#fff' : '#2563eb', fontWeight: 900 }}>
+                                {fmt(discountedPrice)}
+                              </span>
+                            </>
+                          ) : (
+                            <span style={{ color: isActive ? '#fff' : color }}>
+                              {isActive && station.diff !== undefined && station.diff !== 0 && (
+                                <span style={{ 
+                                   fontSize: 10, 
+                                   fontWeight: 800,
+                                   color: station.diff < 0 ? '#bbf7d0' : '#fecaca',
+                                   marginRight: 4
+                                }}>
+                                  {station.diff > 0 ? '+' : ''}{station.diff.toFixed(3)}
+                                </span>
+                              )}
+                              {fmt(rawPrice)}
                             </span>
                           )}
-                          {fmt(price)}
                         </span>
                       </div>
                     )
@@ -314,6 +334,36 @@ export const MapView = () => {
                 >
                   Fijar ruta en Google Maps
                 </a>
+
+                <button
+                  onClick={() => {
+                    const store = useAppStore.getState()
+                    store.setViewMode('list')
+                    // After the view switches and React renders the list, scroll to the station
+                    setTimeout(() => {
+                      const el = document.getElementById(`station-${station.idEstacion}`)
+                      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                    }, 350)
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    width: '100%',
+                    marginTop: 6,
+                    padding: '8px',
+                    background: '#f1f5f9',
+                    color: '#2563eb',
+                    border: '2px solid #e2e8f0',
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  📋 Ver en lista
+                </button>
               </div>
             </Popup>
           </Marker>
