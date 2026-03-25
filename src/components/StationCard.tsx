@@ -95,14 +95,14 @@ export const StationCard = ({ station, isSelected, onClick }: StationCardProps) 
         })}
       </div>
 
-      <div className="space-y-1 text-sm text-gray-500">
-        <div className="flex items-center gap-2">
-          <MapPin size={14} className="text-gray-400" />
-          <span className="truncate">{station.direccion}</span>
+      <div className="space-y-2 text-sm text-gray-500">
+        <div className="flex items-start gap-2">
+          <MapPin size={14} className="text-gray-400 mt-0.5 shrink-0" />
+          <span className="line-clamp-2 leading-snug">{station.direccion}</span>
         </div>
-        <div className="flex items-center gap-2">
-          <Clock size={14} className="text-gray-400" />
-          <span className="truncate text-xs">{station.horario}</span>
+        <div className="flex items-start gap-2">
+          <Clock size={14} className="text-gray-400 mt-0.5 shrink-0" />
+          <span className="text-xs leading-snug">{station.horario}</span>
         </div>
       </div>
 
