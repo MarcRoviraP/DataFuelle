@@ -22,11 +22,22 @@ export const StationCard = ({ station, isSelected, onClick }: StationCardProps) 
       }`}
       onClick={onClick}
     >
-      <div className="flex justify-between items-start mb-2">
+      <div className="flex justify-between items-start mb-2 group">
         <h3 className="font-bold text-gray-900 leading-tight flex-1 pr-2">{station.nombreEstacion}</h3>
-        <span className="text-xl font-black text-blue-600">
-          {station.precioCombustible ? `${station.precioCombustible.toFixed(3)}€` : '---'}
-        </span>
+        <div className="flex flex-col items-end">
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-xl font-black text-blue-600">
+              {station.precioCombustible ? `${station.precioCombustible.toFixed(3)}€` : '---'}
+            </span>
+            {station.diff !== undefined && station.diff !== 0 && (
+              <span className={`text-xs font-bold leading-none translate-y-[-2px] ${
+                station.diff < 0 ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {station.diff > 0 ? '+' : ''}{station.diff.toFixed(3)}
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="space-y-1 text-sm text-gray-500">

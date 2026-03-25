@@ -20,6 +20,10 @@ export interface Station {
   precioG98: number | null
   precioDiesel: number | null
   distancia?: number
+  // Price changes
+  diff?: number
+  delta_pct?: number
+  precioAnterior?: number
 }
 
 const API_BASE_URL = 'https://api.precioil.es'
@@ -81,8 +85,22 @@ export const fetchStationsByRadius = async (
   }))
 }
 
-export const fetchRecentPriceChanges = async (idFuelType: number): Promise<any[]> => {
-  const response = await fetch(`${API_BASE_URL}/cambios/precios?idFuelType=${idFuelType}`)
-  if (!response.ok) throw new Error('Failed to fetch price changes')
-  return response.json()
+export const fetchRecentPriceChanges = async (
+  idFuelType: number,
+  params?: { fechaInicio?: string; fechaFin?: string }
+): Promise<any[]> => {
+  const today = new Date()
+  const yesterday = new Date(today)
+  yesterday.setDate(today.getDate() - 1)
+
+  const fmt = (d: Date) => d.toISOString().split('T')[0]
+  
+  const fechaInicio = params?.fechaInicio || fmt(yesterday)
+  const fechaFin = params?.fechaFin || fmt(today)
+
+  const url = `${API_BASE_URL}/cambios/precios?idFuelType=${idFuelType}&fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`
+  const response = await fetch(url)
+  if (!response.ok) return []
+  const data = await response.json()
+  return Array.isArray(data) ? data : []
 }

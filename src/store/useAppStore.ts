@@ -42,6 +42,9 @@ interface AppState {
   // UI State
   isSidebarOpen: boolean
   setIsSidebarOpen: (isOpen: boolean) => void
+  // Price changes data
+  priceChanges: Map<number, any>
+  setPriceChanges: (changes: any[]) => void
 
   // Actions
   updateFilteredStations: () => void
@@ -98,7 +101,53 @@ export const useAppStore = create<AppState>((set, get) => ({
         distancia: calculateDistance(currentLocation.lat, currentLocation.lon, s.latitud, s.longitud),
       }))
     }
-    set({ stations: stationsWithDist })
+    
+    // Apply existing price changes if any
+    const changes = get().priceChanges
+    const stationsWithChanges = stationsWithDist.map(s => {
+      const change = changes.get(s.idEstacion)
+      if (change) {
+        return { 
+          ...s, 
+          diff: parseFloat(change.diferencia),
+          delta_pct: parseFloat(change.delta_pct),
+          precioAnterior: parseFloat(change.precioAnterior)
+        }
+      }
+      return s
+    })
+
+    set({ stations: stationsWithChanges })
+    get().updateFilteredStations()
+  },
+
+  priceChanges: new Map(),
+  setPriceChanges: (changes) => {
+    const { selectedFuelTypeId } = get()
+    const changeMap = new Map()
+    if (Array.isArray(changes)) {
+      // API returns changes for all fuels; filter to match current selection
+      changes
+        .filter(c => Number(c.idFuelType) === selectedFuelTypeId)
+        .forEach(c => changeMap.set(c.idEstacion, c))
+    }
+    set({ priceChanges: changeMap })
+    
+    // Refresh stations to apply new changes
+    const { stations } = get()
+    const updated = stations.map(s => {
+      const change = changeMap.get(s.idEstacion)
+      if (change) {
+        return { 
+          ...s, 
+          diff: parseFloat(change.diferencia),
+          delta_pct: parseFloat(change.delta_pct),
+          precioAnterior: parseFloat(change.precioAnterior)
+        }
+      }
+      return { ...s, diff: undefined, delta_pct: undefined, precioAnterior: undefined }
+    })
+    set({ stations: updated })
     get().updateFilteredStations()
   },
 

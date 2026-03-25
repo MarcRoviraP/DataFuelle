@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAppStore } from '../store/useAppStore'
-import { fetchStationsByRadius } from '../services/api'
+import { fetchStationsByRadius, fetchRecentPriceChanges } from '../services/api'
 import { geocodeAddress } from '../utils/geo'
 import { Search, MapPin, Fuel, Navigation, History, Filter } from 'lucide-react'
 
@@ -13,6 +13,7 @@ export const Sidebar = () => {
     selectedFuelTypeId,
     setSelectedFuelTypeId,
     fuelTypes,
+    stations,
     setStations,
     searchHistory,
     addToHistory,
@@ -64,13 +65,18 @@ export const Sidebar = () => {
     })
 
     try {
-      const data = await fetchStationsByRadius(
-        searchLat,
-        searchLon,
-        radius,
-        selectedFuelTypeId
-      )
+      const [data, priceChanges] = await Promise.all([
+        fetchStationsByRadius(
+          searchLat,
+          searchLon,
+          radius,
+          selectedFuelTypeId
+        ),
+        fetchRecentPriceChanges(selectedFuelTypeId)
+      ])
+      
       console.log('[Search Result] Success:', data)
+      useAppStore.getState().setPriceChanges(priceChanges)
       setStations(data)
       if (query) addToHistory(query)
       // Close sidebar on mobile after search
@@ -107,6 +113,21 @@ export const Sidebar = () => {
         alert(message)
       }
     )
+  }
+
+  const handleFuelChange = async (id: number) => {
+    setSelectedFuelTypeId(id)
+    
+    // Also re-fetch changes for this fuel type if we have stations
+    if (stations.length > 0) {
+      try {
+        const changes = await fetchRecentPriceChanges(id)
+        useAppStore.getState().setPriceChanges(changes)
+      } catch (e) {
+        console.error('Error fetching changes for new fuel type:', e)
+        useAppStore.getState().setPriceChanges([])
+      }
+    }
   }
 
   return (
@@ -164,9 +185,9 @@ export const Sidebar = () => {
               <select
                 className="w-full p-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-blue-400 transition-all appearance-none cursor-pointer text-slate-700 font-semibold pr-10 relative"
                 value={selectedFuelTypeId}
-                onChange={(e) => setSelectedFuelTypeId(Number(e.target.value))}
+                onChange={(e) => handleFuelChange(Number(e.target.value))}
               >
-                {fuelTypes.map((type) => (
+                {fuelTypes.map((type: any) => (
                   <option key={type.idFuelType} value={type.idFuelType}>
                     {type.fuelTypeName}
                   </option>

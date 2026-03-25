@@ -153,7 +153,7 @@ export const MapView = () => {
         <div style="
           background: ${isSelected ? '#2563eb' : color};
           color: white;
-          padding: 3px 7px;
+          padding: 3px 12px 3px 7px;
           border-radius: 6px;
           font-weight: 800;
           font-size: 11px;
@@ -167,8 +167,8 @@ export const MapView = () => {
           ${price.toFixed(3)}€
         </div>
       `,
-      iconSize: [50, 24],
-      iconAnchor: [25, 12],
+      iconSize: [60, 24],
+      iconAnchor: [30, 12],
     })
   }
 
@@ -185,6 +185,7 @@ export const MapView = () => {
         center={currentLocation ? [currentLocation.lat, currentLocation.lon] : defaultCenter}
         zoom={13}
         className="w-full h-full"
+        attributionControl={false}
       >
         <LayersControl position="topright">
           <BaseLayer checked name="Mapa">
@@ -265,7 +266,20 @@ export const MapView = () => {
                         <span style={{
                           fontWeight: 800, fontSize: 13,
                           color: isActive ? '#fff' : color,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4
                         }}>
+                          {isActive && station.diff !== undefined && station.diff !== 0 && (
+                            <span style={{ 
+                               fontSize: 10, 
+                               fontWeight: 800,
+                               color: station.diff < 0 ? '#bbf7d0' : '#fecaca',
+                               marginLeft: 4
+                            }}>
+                              {station.diff > 0 ? '+' : ''}{station.diff.toFixed(3)}
+                            </span>
+                          )}
                           {fmt(price)}
                         </span>
                       </div>
