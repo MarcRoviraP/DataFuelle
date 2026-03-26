@@ -1,4 +1,4 @@
-import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents, LayersControl, ZoomControl } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMap, useMapEvents, LayersControl, ZoomControl } from 'react-leaflet'
 
 const { BaseLayer } = LayersControl
 import { useAppStore } from '../store/useAppStore'
@@ -217,11 +217,11 @@ export const MapView = () => {
 
         {currentLocation && (
           <Marker position={[currentLocation.lat, currentLocation.lon]} icon={LocationIcon}>
-            <Popup>
+            <Tooltip direction="top" offset={[0, -10]} opacity={1}>
               <div style={{ fontWeight: 700, color: '#2563eb', fontSize: 13 }}>
                 📍 Tu ubicación actual
               </div>
-            </Popup>
+            </Tooltip>
           </Marker>
         )}
 
