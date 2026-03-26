@@ -1,73 +1,49 @@
-# React + TypeScript + Vite
+# ⛽ DataFuelle
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+DataFuelle es una aplicación web reactiva y moderna diseñada para consultar precios de combustible en tiempo real, optimizada para dispositivos móviles y con una interfaz premium.
 
-Currently, two official plugins are available:
+## ✨ Características principales
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **📍 Mapa interactivo**: Visualización de gasolineras cercanas con colores dinámicos basados en el precio (Verde: Barato, Naranja: Medio, Rojo: Caro).
+- **📋 Lista inteligente**: Listado ordenado de gasolineras con detalles completos y navegación fluida.
+- **🕒 Alertas de actualización**: Indicador visual si los datos de una gasolinera tienen más de 12 horas de antigüedad.
+- **💸 Gestión de descuentos**: Permite aplicar descuentos personalizados por litro para ver el precio final real.
+- **🗺️ Integración con Google Maps**: Botón directo para iniciar la ruta a cualquier gasolinera elegida.
+- **📱 Mobile First**: Diseño totalmente adaptado a pantallas táctiles con transiciones suaves entre vista de mapa y lista.
 
-## React Compiler
+## 🚀 Tecnologías utilizadas
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **React 19** + **TypeScript**
+- **Vite** para un desarrollo ultrarrápido.
+- **Tailwind CSS 4** para un diseño moderno y fluido.
+- **Leaflet** & **React Leaflet** para la gestión de mapas.
+- **Zustand** para la gestión de estado global eficiente.
+- **Lucide React** para iconografía elegante.
 
-## Expanding the ESLint configuration
+## 🛠️ Instalación y ejecución
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+1. Instalación de dependencias:
+   ```bash
+   npm install
+   ```
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+2. Ejecución en modo desarrollo:
+   ```bash
+   npm run dev
+   ```
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+3. Construcción para producción:
+   ```bash
+   npm run build
+   ```
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## 📂 Estructura del proyecto
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+- `src/components`: Componentes UI reutilizables (MapView, StationCard, Sidebar, etc.).
+- `src/services`: Lógica de comunicación con la API de precios.
+- `src/store`: Estado global con Zustand.
+- `src/utils`: Utilidades de geolocalización, formateo de fechas y cálculos.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## 📝 Notas de desarrollo
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+Este proyecto utiliza un sistema de **Agent Context Logging** para mantener la trazabilidad de los cambios realizados por los asistentes de IA. Puedes consultar el historial en la carpeta `logs_md_agente`.

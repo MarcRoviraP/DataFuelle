@@ -25,6 +25,7 @@ export interface Station {
   diff?: number
   delta_pct?: number
   precioAnterior?: number
+  lastUpdate: string
 }
 
 const API_BASE_URL = 'https://api.precioil.es'

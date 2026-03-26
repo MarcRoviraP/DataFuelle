@@ -5,7 +5,8 @@ import { useAppStore } from '../store/useAppStore'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useEffect, useLayoutEffect, useRef } from 'react'
-import { LocateFixed } from 'lucide-react'
+import { LocateFixed, Calendar } from 'lucide-react'
+import { shouldShowLastUpdate, formatLastUpdate } from '../utils/date'
 
 // Fix generic Leaflet icon issue
 import markerIcon from 'leaflet/dist/images/marker-icon.png'
@@ -311,7 +312,13 @@ export const MapView = () => {
 
                 <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.5, marginBottom: 10 }}>
                   <p>{station.direccion}</p>
-                  <p>{station.horario}</p>
+                  <p style={{ display: 'flex', alignItems: 'center', gap: 4 }}>{station.horario}</p>
+                  {shouldShowLastUpdate(station.lastUpdate) && (
+                    <p style={{ color: '#d97706', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                      <Calendar size={12} />
+                      {formatLastUpdate(station.lastUpdate)}
+                    </p>
+                  )}
                 </div>
 
                 <a

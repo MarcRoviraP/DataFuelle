@@ -24,6 +24,8 @@ export const Sidebar = () => {
     setSortBy,
     showOnlyOpen,
     setShowOnlyOpen,
+    showOnlyUpdatedToday,
+    setShowOnlyUpdatedToday,
     setIsSidebarOpen,
   } = useAppStore()
 
@@ -300,6 +302,24 @@ export const Sidebar = () => {
               </button>
             </div>
 
+            <div className="flex items-center justify-between px-1">
+              <label className="text-sm font-bold text-slate-700">
+                Actualizadas hoy
+              </label>
+              <button
+                onClick={() => setShowOnlyUpdatedToday(!showOnlyUpdatedToday)}
+                className={`w-12 h-6 rounded-full p-1 transition-colors ${
+                  showOnlyUpdatedToday ? 'bg-green-500' : 'bg-slate-300'
+                }`}
+              >
+                <div
+                  className={`w-4 h-4 rounded-full bg-white transition-transform ${
+                    showOnlyUpdatedToday ? 'translate-x-6' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
             <div className="space-y-3 pt-2">
               <div className="flex justify-between items-center px-1">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -312,7 +332,7 @@ export const Sidebar = () => {
               <input
                 type="range"
                 min="1"
-                max="40"
+                max="100"
                 step="1"
                 className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600 hover:accent-blue-700 transition-all"
                 value={radius}
@@ -320,7 +340,7 @@ export const Sidebar = () => {
               />
               <div className="flex justify-between text-[10px] text-slate-400 font-bold px-1">
                 <span>1KM</span>
-                <span>40KM</span>
+                <span>100KM</span>
               </div>
             </div>
           </div>

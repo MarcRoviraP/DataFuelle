@@ -1,5 +1,6 @@
 import type { Station } from '../services/api'
-import { MapPin, Clock, Navigation, Tag } from 'lucide-react'
+import { MapPin, Clock, Navigation, Tag, Calendar } from 'lucide-react'
+import { shouldShowLastUpdate, formatLastUpdate } from '../utils/date'
 import { formatDistance } from '../utils/geo'
 import { useAppStore } from '../store/useAppStore'
 
@@ -104,6 +105,12 @@ export const StationCard = ({ station, isSelected, onClick }: StationCardProps) 
           <Clock size={14} className="text-gray-400 mt-0.5 shrink-0" />
           <span className="text-xs leading-snug">{station.horario}</span>
         </div>
+        {shouldShowLastUpdate(station.lastUpdate) && (
+          <div className="flex items-start gap-2 text-amber-600 font-medium">
+            <Calendar size={14} className="mt-0.5 shrink-0" />
+            <span className="text-xs leading-snug">{formatLastUpdate(station.lastUpdate)}</span>
+          </div>
+        )}
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-3">

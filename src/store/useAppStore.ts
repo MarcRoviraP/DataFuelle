@@ -30,6 +30,8 @@ interface AppState {
   setSortBy: (sortBy: 'price' | 'distance') => void
   showOnlyOpen: boolean
   setShowOnlyOpen: (open: boolean) => void
+  showOnlyUpdatedToday: boolean
+  setShowOnlyUpdatedToday: (show: boolean) => void
 
   // Search History
   searchHistory: string[]
@@ -101,6 +103,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   showOnlyOpen: false,
   setShowOnlyOpen: (showOnlyOpen) => {
     set({ showOnlyOpen })
+    get().updateFilteredStations()
+  },
+  showOnlyUpdatedToday: false,
+  setShowOnlyUpdatedToday: (showOnlyUpdatedToday) => {
+    set({ showOnlyUpdatedToday })
     get().updateFilteredStations()
   },
 
@@ -191,7 +198,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   updateFilteredStations: () => {
-    const { stations, radius, selectedBrands, sortBy, showOnlyOpen, stationDiscounts } = get()
+    const { stations, radius, selectedBrands, sortBy, showOnlyOpen, showOnlyUpdatedToday, stationDiscounts } = get()
     
     let filtered = stations.map(s => ({
       ...s,
@@ -228,6 +235,16 @@ export const useAppStore = create<AppState>((set, get) => ({
           return currentTime >= start && currentTime <= end
         }
         return true // Default if unparseable
+      })
+    }
+
+    // Filter by Updated Today
+    if (showOnlyUpdatedToday) {
+      const now = new Date()
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+      filtered = filtered.filter(s => {
+        if (!s.lastUpdate) return false
+        return s.lastUpdate.startsWith(today)
       })
     }
 
