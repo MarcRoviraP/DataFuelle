@@ -110,7 +110,7 @@ function LineChart({ data, fuelKey }: { data: any[]; fuelKey: string }) {
         ))}
 
         {/* Hover zones */}
-        {data.map((d, i) => (
+        {data.map((_, i) => (
           <rect
             key={i}
             x={i === 0 ? PAD.left : (xs[i - 1] + xs[i]) / 2}
