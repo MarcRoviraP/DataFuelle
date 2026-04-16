@@ -22,3 +22,23 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# --- Datafuelle specific ---
+
+# Large raw data files (fetched from Ministry API, not source code)
+stations.json
+
+# Manual SQL sync dumps (generated, not source code)
+sync_*.sql
+sync_full_*.sql
+fake_history.sql
+temp_sync.sql
+
+# Backfill scripts (contain hardcoded service_role key — NEVER commit)
+run_backfill_local.js
+run_backfill.sh
+backfill.log
+
+# Supabase local env
+supabase/.env
+supabase/config.toml

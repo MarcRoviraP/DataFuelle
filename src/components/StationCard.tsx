@@ -1,5 +1,6 @@
-import type { Station } from '../services/api'
-import { MapPin, Clock, Navigation, Tag, Calendar } from 'lucide-react'
+import { useState } from 'react'
+import { fetchStationHistory, type Station } from '../services/api'
+import { MapPin, Clock, Navigation, Tag, Calendar, TrendingUp, ChevronDown, ChevronUp } from 'lucide-react'
 import { shouldShowLastUpdate, formatLastUpdate } from '../utils/date'
 import { formatDistance } from '../utils/geo'
 import { useAppStore } from '../store/useAppStore'
@@ -16,15 +17,184 @@ const fuelTypes = [
   { key: 'precioDiesel' as const, label: 'DSL' },
 ]
 
+// Tab config: label + days (null = all)
+const PERIOD_TABS: { label: string; days: number | null }[] = [
+  { label: '7 d',  days: 7 },
+  { label: '30 d', days: 30 },
+  { label: 'Todo', days: null },
+]
+
+// SVG line chart — pure, no deps
+function LineChart({ data, fuelKey }: { data: any[]; fuelKey: string }) {
+  const W = 260
+  const H = 80
+  const PAD = { top: 8, right: 6, bottom: 20, left: 32 }
+
+  const prices = data.map(d => Number(d[fuelKey]) || 0).filter(p => p > 0)
+  if (prices.length < 2) return (
+    <div className="h-20 flex items-center justify-center text-[10px] text-slate-400">
+      Insuficientes datos para graficar
+    </div>
+  )
+
+  const minP = Math.min(...prices)
+  const maxP = Math.max(...prices)
+  const rangeP = maxP - minP || 0.01
+
+  const innerW = W - PAD.left - PAD.right
+  const innerH = H - PAD.top - PAD.bottom
+
+  const xs = data.map((_, i) => PAD.left + (i / (data.length - 1)) * innerW)
+  const ys = data.map(d => PAD.top + innerH - ((Number(d[fuelKey]) || 0) - minP) / rangeP * innerH)
+
+  const polyline = xs.map((x, i) => `${x},${ys[i]}`).join(' ')
+
+  // Gradient fill path
+  const fillPath = `M${xs[0]},${ys[0]} ` +
+    xs.slice(1).map((x, i) => `L${x},${ys[i + 1]}`).join(' ') +
+    ` L${xs[xs.length - 1]},${PAD.top + innerH} L${xs[0]},${PAD.top + innerH} Z`
+
+  // Y axis labels
+  const yLabels = [minP, (minP + maxP) / 2, maxP]
+
+  // X axis: show first, middle and last date
+  const xDates = [0, Math.floor((data.length - 1) / 2), data.length - 1]
+    .filter((i, pos, arr) => arr.indexOf(i) === pos)
+    .map(i => ({ x: xs[i], label: new Date(data[i].recorded_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) }))
+
+  // Hover state
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
+
+  return (
+    <div className="relative select-none">
+      <svg
+        width="100%"
+        viewBox={`0 0 ${W} ${H}`}
+        className="overflow-visible"
+        onMouseLeave={() => setHoveredIdx(null)}
+      >
+        <defs>
+          <linearGradient id={`lg-${fuelKey}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.25" />
+            <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+
+        {/* Fill area */}
+        <path d={fillPath} fill={`url(#lg-${fuelKey})`} />
+
+        {/* Horizontal grid */}
+        {yLabels.map((_, i) => {
+          const gy = PAD.top + (innerH / (yLabels.length - 1)) * (yLabels.length - 1 - i)
+          return <line key={i} x1={PAD.left} y1={gy} x2={PAD.left + innerW} y2={gy} stroke="#e2e8f0" strokeWidth="0.5" />
+        })}
+
+        {/* Y axis labels */}
+        {yLabels.map((val, i) => {
+          const gy = PAD.top + (innerH / (yLabels.length - 1)) * (yLabels.length - 1 - i)
+          return (
+            <text key={i} x={PAD.left - 3} y={gy + 3} textAnchor="end" fontSize="7" fill="#94a3b8" fontFamily="sans-serif">
+              {val.toFixed(3)}
+            </text>
+          )
+        })}
+
+        {/* Line */}
+        <polyline points={polyline} fill="none" stroke="#3b82f6" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+
+        {/* X axis dates */}
+        {xDates.map(({ x, label }) => (
+          <text key={label} x={x} y={H - 4} textAnchor="middle" fontSize="7" fill="#94a3b8" fontFamily="sans-serif">
+            {label}
+          </text>
+        ))}
+
+        {/* Hover zones */}
+        {data.map((d, i) => (
+          <rect
+            key={i}
+            x={i === 0 ? PAD.left : (xs[i - 1] + xs[i]) / 2}
+            y={PAD.top}
+            width={i === 0 ? (xs[1] - xs[0]) / 2 : i === data.length - 1 ? (xs[i] - xs[i - 1]) / 2 : (xs[i + 1] - xs[i - 1]) / 2}
+            height={innerH}
+            fill="transparent"
+            onMouseEnter={() => setHoveredIdx(i)}
+          />
+        ))}
+
+        {/* Hover dot + tooltip */}
+        {hoveredIdx !== null && (
+          <>
+            <circle cx={xs[hoveredIdx]} cy={ys[hoveredIdx]} r={3} fill="#3b82f6" stroke="white" strokeWidth="1.5" />
+            <g>
+              <rect
+                x={Math.min(xs[hoveredIdx] - 22, W - 58)}
+                y={ys[hoveredIdx] - 22}
+                width={52}
+                height={14}
+                rx={3}
+                fill="#1e293b"
+                opacity={0.92}
+              />
+              <text
+                x={Math.min(xs[hoveredIdx] - 22, W - 58) + 26}
+                y={ys[hoveredIdx] - 12}
+                textAnchor="middle"
+                fontSize="7.5"
+                fill="white"
+                fontFamily="sans-serif"
+                fontWeight="bold"
+              >
+                {Number(data[hoveredIdx][fuelKey]).toFixed(3)}€
+              </text>
+            </g>
+          </>
+        )}
+      </svg>
+    </div>
+  )
+}
+
 export const StationCard = ({ station, isSelected, onClick }: StationCardProps) => {
-  const { stationDiscounts, setStationDiscount } = useAppStore()
+  const { stationDiscounts, setStationDiscount, selectedFuelTypeId } = useAppStore()
   const currentDiscount = stationDiscounts.get(station.idEstacion) || 0
+
+  const [showHistory, setShowHistory] = useState(false)
+  const [activeDays, setActiveDays] = useState<number | null>(7)
+  const [historyData, setHistoryData] = useState<any[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(false)
+  
+  const fuelKey = selectedFuelTypeId === 9 ? 'price_95' : selectedFuelTypeId === 12 ? 'price_98' : 'price_diesel'
+  const fuelLabel = fuelKey === 'price_95' ? 'G95' : fuelKey === 'price_98' ? 'G98' : 'DSL'
+
+  const loadHistory = async (days: number | null) => {
+    setLoadingHistory(true)
+    const data = await fetchStationHistory(station.idEstacion, days)
+    setHistoryData(data)
+    setLoadingHistory(false)
+  }
+
+  const handleTab = async (days: number | null) => {
+    if (days === activeDays) return
+    setActiveDays(days)
+    await loadHistory(days)
+  }
 
   const handleGoogleMaps = (e: React.MouseEvent) => {
     e.stopPropagation()
     const url = `https://www.google.com/maps/dir/?api=1&destination=${station.latitud},${station.longitud}`
     window.open(url, '_blank')
   }
+
+  // Trend badge: last vs first in the current window
+  const trendBadge = historyData.length > 1 ? (() => {
+    const first = Number(historyData[0][fuelKey])
+    const last  = Number(historyData[historyData.length - 1][fuelKey])
+    const diff  = last - first
+    const color = diff > 0 ? 'bg-red-100 text-red-600' : diff < 0 ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-500'
+    const icon  = diff > 0 ? '▲' : diff < 0 ? '▼' : '='
+    return <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${color}`}>{icon} {Math.abs(diff).toFixed(3)}€</span>
+  })() : null
 
   return (
     <div
@@ -94,7 +264,72 @@ export const StationCard = ({ station, isSelected, onClick }: StationCardProps) 
             </div>
           )
         })}
+        
+        <button 
+          className="flex flex-col items-center justify-center bg-blue-50 border border-blue-100 rounded-lg px-2 py-1 min-w-[52px] hover:bg-blue-100 transition-colors"
+          onClick={(e) => {
+            e.stopPropagation()
+            const next = !showHistory
+            setShowHistory(next)
+            if (next && historyData.length === 0) loadHistory(activeDays)
+          }}
+        >
+          <span className="text-[9px] font-bold text-blue-500 uppercase tracking-wide">HIST.</span>
+          {showHistory ? <ChevronUp size={12} className="text-blue-600" /> : <ChevronDown size={12} className="text-blue-600" />}
+        </button>
       </div>
+
+      {/* History Panel — SVG Line Chart */}
+      {showHistory && (
+        <div className="mb-4 p-3 bg-slate-50 rounded-xl border border-blue-100 animate-in fade-in slide-in-from-top-2 shadow-inner">
+          {/* Header */}
+          <div className="flex justify-between items-center mb-3">
+            <div className="flex items-center gap-1.5">
+              <TrendingUp size={13} className="text-blue-500" />
+              <span className="text-[10px] font-black text-slate-600 uppercase tracking-wider">
+                Historial · {fuelLabel}
+              </span>
+            </div>
+            {trendBadge}
+          </div>
+
+          {/* Period tabs */}
+          <div className="flex gap-1.5 mb-3">
+            {PERIOD_TABS.map(({ label, days }) => (
+              <button
+                key={label}
+                onClick={(e) => { e.stopPropagation(); handleTab(days) }}
+                className={`text-[9px] px-2.5 py-0.5 rounded-full font-bold transition-all ${
+                  activeDays === days
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-white text-slate-400 border border-slate-200 hover:border-blue-300 hover:text-blue-500'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Chart area */}
+          {loadingHistory ? (
+            <div className="h-20 flex flex-col items-center justify-center text-[10px] text-slate-400 italic">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mb-2" />
+              Cargando...
+            </div>
+          ) : historyData.length > 0 ? (
+            <>
+              <LineChart data={historyData} fuelKey={fuelKey} />
+              <p className="text-[9px] text-slate-400 text-right mt-1">
+                {historyData.length} registros
+              </p>
+            </>
+          ) : (
+            <div className="h-16 flex items-center justify-center text-[10px] text-slate-400 border-2 border-dashed border-slate-200 rounded-lg">
+              Sin datos para este período
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="space-y-2 text-sm text-gray-500">
         <div className="flex items-start gap-2">
@@ -136,3 +371,5 @@ export const StationCard = ({ station, isSelected, onClick }: StationCardProps) 
     </div>
   )
 }
+
+

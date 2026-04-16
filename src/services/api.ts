@@ -1,3 +1,5 @@
+import { supabaseFetch } from './supabaseClient'
+
 export interface FuelType {
   idFuelType: number
   fuelTypeName: string
@@ -118,4 +120,18 @@ export const fetchRecentPriceChanges = async (
   if (!response.ok) return []
   const data = await response.json()
   return Array.isArray(data) ? data : []
+}
+export const fetchStationHistory = async (idEstacion: number, days: number | null = 30): Promise<any[]> => {
+  let query = `price_history?station_id=eq.${idEstacion}&order=recorded_at.asc`
+  if (days !== null) {
+    const since = new Date()
+    since.setDate(since.getDate() - days)
+    query += `&recorded_at=gte.${since.toISOString()}`
+  }
+  try {
+    return await supabaseFetch(query)
+  } catch (error) {
+    console.error('[History API Error]', error)
+    return []
+  }
 }
