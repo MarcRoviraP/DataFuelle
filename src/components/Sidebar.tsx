@@ -250,8 +250,9 @@ export const Sidebar = () => {
               <select
                 className="w-full p-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-blue-400 transition-all appearance-none cursor-pointer text-slate-700 font-semibold pr-10 relative"
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as 'price' | 'distance')}
+                onChange={(e) => setSortBy(e.target.value as 'price' | 'distance' | 'smart')}
               >
+                <option value="smart">Smart (Equilibrado)</option>
                 <option value="price">Precio (Económico)</option>
                 <option value="distance">Proximidad</option>
               </select>

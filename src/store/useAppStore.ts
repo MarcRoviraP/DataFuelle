@@ -26,8 +26,8 @@ interface AppState {
   // New Filters & Sort
   selectedBrands: string[]
   setSelectedBrands: (brands: string[]) => void
-  sortBy: 'price' | 'distance'
-  setSortBy: (sortBy: 'price' | 'distance') => void
+  sortBy: 'price' | 'distance' | 'smart'
+  setSortBy: (sortBy: 'price' | 'distance' | 'smart') => void
   showOnlyOpen: boolean
   setShowOnlyOpen: (open: boolean) => void
   showOnlyUpdatedToday: boolean
@@ -249,16 +249,39 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
 
     // Sorting
-    filtered.sort((a, b) => {
-      if (sortBy === 'price') {
-        const priceA = a.precioCombustible || 999
-        const priceB = b.precioCombustible || 999
-        if (priceA !== priceB) return priceA - priceB
-        return (a.distancia || 0) - (b.distancia || 0)
-      } else {
-        return (a.distancia || 0) - (b.distancia || 0)
-      }
-    })
+    if (sortBy === 'smart' && filtered.length > 0) {
+      const distances = filtered.map(s => s.distancia || 0)
+      const prices = filtered.map(s => s.precioCombustible || 9.99)
+
+      const minDist = Math.min(...distances)
+      const maxDist = Math.max(...distances)
+      const minPrice = Math.min(...prices)
+      const maxPrice = Math.max(...prices)
+
+      const norm = (val: number, min: number, max: number) => 
+        max === min ? 0 : (val - min) / (max - min)
+
+      const scoredStations = filtered.map(s => {
+        const dScore = norm(s.distancia || 0, minDist, maxDist)
+        const pScore = norm(s.precioCombustible || 9.99, minPrice, maxPrice)
+        // Weighting: 50% distance, 50% price
+        return { station: s, score: dScore * 0.5 + pScore * 0.5 }
+      })
+
+      scoredStations.sort((a, b) => a.score - b.score)
+      filtered = scoredStations.map(item => item.station)
+    } else {
+      filtered.sort((a, b) => {
+        if (sortBy === 'price') {
+          const priceA = a.precioCombustible || 999
+          const priceB = b.precioCombustible || 999
+          if (priceA !== priceB) return priceA - priceB
+          return (a.distancia || 0) - (b.distancia || 0)
+        } else {
+          return (a.distancia || 0) - (b.distancia || 0)
+        }
+      })
+    }
 
     set({ filteredStations: filtered })
   },
