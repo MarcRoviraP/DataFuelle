@@ -60,7 +60,7 @@ function App() {
 
       <main className="flex-1 flex flex-col xl:flex-row overflow-hidden relative">
         {/* Results List - Visible on XL or if explicitly selected on mobile */}
-        <section className={`flex-none min-h-0 xl:w-[350px] xl:shrink-0 xl:flex flex-col border-r border-slate-200 bg-white ${
+        <section className={`flex-1 xl:flex-none min-h-0 xl:w-[350px] xl:shrink-0 xl:flex flex-col border-r border-slate-200 bg-white ${
           viewMode === 'list' ? 'flex' : 'hidden xl:flex'
         }`}>
           <StationList />
