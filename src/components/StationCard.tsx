@@ -34,7 +34,7 @@ export const StationCard = ({ station, isSelected, onClick }: StationCardProps) 
       onClick={onClick}
     >
       <div className="flex justify-between items-start mb-2 group">
-        <h3 className="font-semibold text-gray-900 leading-tight flex-1 pr-2">{station.nombreEstacion}</h3>
+        <h3 className="font-bold text-gray-900 leading-tight flex-1 pr-1 line-clamp-3 overflow-hidden text-xs uppercase">{station.nombreEstacion}</h3>
         <div className="flex flex-col items-end">
           <div className="flex items-baseline gap-1.5 flex-wrap justify-end">
             {currentDiscount > 0 && station.precioBase && (
@@ -99,7 +99,7 @@ export const StationCard = ({ station, isSelected, onClick }: StationCardProps) 
       <div className="space-y-2 text-sm text-gray-500">
         <div className="flex items-start gap-2">
           <MapPin size={14} className="text-gray-400 mt-0.5 shrink-0" />
-          <span className="line-clamp-2 leading-snug">{station.direccion}</span>
+          <span className="line-clamp-3 leading-snug text-[11px] text-slate-500 font-medium">{station.direccion}</span>
         </div>
         <div className="flex items-start gap-2">
           <Clock size={14} className="text-gray-400 mt-0.5 shrink-0" />

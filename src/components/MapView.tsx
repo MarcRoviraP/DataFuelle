@@ -1,4 +1,7 @@
 import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMap, useMapEvents, LayersControl, ZoomControl } from 'react-leaflet'
+import MarkerClusterGroup from 'react-leaflet-cluster'
+import 'leaflet.markercluster/dist/MarkerCluster.css'
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 
 const { BaseLayer } = LayersControl
 import { useAppStore } from '../store/useAppStore'
@@ -179,6 +182,48 @@ export const MapView = () => {
     })
   }
 
+  const createClusterCustomIcon = (cluster: any) => {
+    const markers = cluster.getAllChildMarkers()
+    let minPriceInCluster = Infinity
+    
+    markers.forEach((m: any) => {
+      const price = m.options.stationPrice
+      if (price && price > 0 && price < minPriceInCluster) {
+        minPriceInCluster = price
+      }
+    })
+
+    let color = '#d97706' // Orange (Default)
+    if (minPriceInCluster !== Infinity && averagePrice > 0) {
+      if (minPriceInCluster < averagePrice * 0.98) color = '#16a34a' // Green (Cheap)
+      else if (minPriceInCluster > averagePrice * 1.02) color = '#dc2626' // Red (Expensive)
+    }
+
+    return L.divIcon({
+      html: `
+        <div style="
+          background: ${color};
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: white;
+          font-weight: 800;
+          font-size: 14px;
+          box-shadow: 0 0 15px ${color}66, inset 0 0 10px rgba(0,0,0,0.2);
+          border: 3px solid rgba(255,255,255,0.8);
+          backdrop-filter: blur(4px);
+        ">
+          <span>${cluster.getChildCount()}</span>
+        </div>
+      `,
+      className: 'custom-marker-cluster',
+      iconSize: L.point(40, 40, true),
+    })
+  }
+
   // Fuel badge config
   const fuels = [
     { id: 9,  label: 'G 95',   key: 'precioG95'    as const, color: '#16a34a' },
@@ -225,158 +270,169 @@ export const MapView = () => {
           </Marker>
         )}
 
-        {filteredStations.map((station) => (
-          <Marker
-            key={station.idEstacion}
-            position={[station.latitud, station.longitud]}
-            icon={getPriceIcon(station.precioCombustible, selectedStationId === station.idEstacion)}
-            ref={(ref) => {
-              if (ref) markerRefs.current.set(station.idEstacion, ref)
-              else markerRefs.current.delete(station.idEstacion)
-            }}
-            eventHandlers={{
-              click: () => useAppStore.getState().setSelectedStationId(station.idEstacion)
-            }}
-          >
-            <Popup minWidth={200}>
-              <div style={{ padding: '4px 2px', minWidth: 200 }}>
-                <h4 style={{
-                  fontWeight: 600, fontSize: 13, color: '#0f172a',
-                  borderBottom: '1px solid #e2e8f0', paddingBottom: 6, marginBottom: 8
-                }}>
-                  {station.nombreEstacion}
-                </h4>
+        <MarkerClusterGroup
+          chunkedLoading
+          iconCreateFunction={createClusterCustomIcon}
+          disableClusteringAtZoom={14}
+          maxClusterRadius={180}
+          spiderfyOnMaxZoom={true}
+          showCoverageOnHover={false}
+        >
+          {filteredStations.map((station) => (
+            <Marker
+              key={station.idEstacion}
+              position={[station.latitud, station.longitud]}
+              icon={getPriceIcon(station.precioCombustible, selectedStationId === station.idEstacion)}
+              // @ts-ignore - custom property for cluster logic
+              stationPrice={station.precioCombustible}
+              ref={(ref) => {
+                if (ref) markerRefs.current.set(station.idEstacion, ref)
+                else markerRefs.current.delete(station.idEstacion)
+              }}
+              eventHandlers={{
+                click: () => useAppStore.getState().setSelectedStationId(station.idEstacion)
+              }}
+            >
+              <Popup minWidth={200}>
+                <div style={{ padding: '4px 2px', minWidth: 200 }}>
+                  <h4 style={{
+                    fontWeight: 600, fontSize: 13, color: '#0f172a',
+                    borderBottom: '1px solid #e2e8f0', paddingBottom: 6, marginBottom: 8
+                  }}>
+                    {station.nombreEstacion}
+                  </h4>
 
-                {/* 3 fuel prices */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 8 }}>
-                  {fuels.map(({ id, label, key, color }) => {
-                    const isActive = selectedFuelTypeId === id
-                    const rawPrice = station[key]
-                    const discount = stationDiscounts.get(station.idEstacion) ?? 0
-                    const discountedPrice = rawPrice && discount > 0 ? rawPrice - discount : null
-                    return (
-                      <div
-                        key={id}
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          padding: '5px 10px',
-                          borderRadius: 8,
-                          background: isActive ? color : '#f8fafc',
-                          border: isActive ? `2px solid ${color}` : '2px solid #e2e8f0',
-                          transition: 'all 0.2s',
-                        }}
-                      >
-                        <span style={{
-                          fontWeight: 700, fontSize: 12,
-                          color: isActive ? '#fff' : '#64748b',
-                        }}>
-                          {isActive ? '★ ' : ''}{label}
-                        </span>
-                        <span style={{
-                          fontWeight: 800, fontSize: 13,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 4
-                        }}>
-                          {discountedPrice !== null ? (
-                            <>
-                              <span style={{ textDecoration: 'line-through', color: isActive ? 'rgba(255,255,255,0.6)' : '#94a3b8', fontSize: 11 }}>
+                  {/* 3 fuel prices */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 8 }}>
+                    {fuels.map(({ id, label, key, color }) => {
+                      const isActive = selectedFuelTypeId === id
+                      const rawPrice = station[key]
+                      const discount = stationDiscounts.get(station.idEstacion) ?? 0
+                      const discountedPrice = rawPrice && discount > 0 ? rawPrice - discount : null
+                      return (
+                        <div
+                          key={id}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '5px 10px',
+                            borderRadius: 8,
+                            background: isActive ? color : '#f8fafc',
+                            border: isActive ? `2px solid ${color}` : '2px solid #e2e8f0',
+                            transition: 'all 0.2s',
+                          }}
+                        >
+                          <span style={{
+                            fontWeight: 700, fontSize: 12,
+                            color: isActive ? '#fff' : '#64748b',
+                          }}>
+                            {isActive ? '★ ' : ''}{label}
+                          </span>
+                          <span style={{
+                            fontWeight: 800, fontSize: 13,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4
+                          }}>
+                            {discountedPrice !== null ? (
+                              <>
+                                <span style={{ textDecoration: 'line-through', color: isActive ? 'rgba(255,255,255,0.6)' : '#94a3b8', fontSize: 11 }}>
+                                  {fmt(rawPrice)}
+                                </span>
+                                <span style={{ color: isActive ? '#fff' : '#2563eb', fontWeight: 900 }}>
+                                  {fmt(discountedPrice)}
+                                </span>
+                              </>
+                            ) : (
+                              <span style={{ color: isActive ? '#fff' : color }}>
+                                {isActive && station.diff !== undefined && station.diff !== 0 && (
+                                  <span style={{ 
+                                     fontSize: 10, 
+                                     fontWeight: 800,
+                                     color: station.diff < 0 ? '#bbf7d0' : '#fecaca',
+                                     marginRight: 4
+                                  }}>
+                                    {station.diff > 0 ? '+' : ''}{station.diff.toFixed(3)}
+                                  </span>
+                                )}
                                 {fmt(rawPrice)}
                               </span>
-                              <span style={{ color: isActive ? '#fff' : '#2563eb', fontWeight: 900 }}>
-                                {fmt(discountedPrice)}
-                              </span>
-                            </>
-                          ) : (
-                            <span style={{ color: isActive ? '#fff' : color }}>
-                              {isActive && station.diff !== undefined && station.diff !== 0 && (
-                                <span style={{ 
-                                   fontSize: 10, 
-                                   fontWeight: 800,
-                                   color: station.diff < 0 ? '#bbf7d0' : '#fecaca',
-                                   marginRight: 4
-                                }}>
-                                  {station.diff > 0 ? '+' : ''}{station.diff.toFixed(3)}
-                                </span>
-                              )}
-                              {fmt(rawPrice)}
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                    )
-                  })}
+                            )}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.5, marginBottom: 10 }}>
+                    <p>{station.direccion}</p>
+                    <p style={{ display: 'flex', alignItems: 'center', gap: 4 }}>{station.horario}</p>
+                    {shouldShowLastUpdate(station.lastUpdate) && (
+                      <p style={{ color: '#d97706', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                        <Calendar size={12} />
+                        {formatLastUpdate(station.lastUpdate)}
+                      </p>
+                    )}
+                  </div>
+
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${station.latitud},${station.longitud}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                      width: '100%',
+                      padding: '8px',
+                      background: '#2563eb',
+                      color: 'white',
+                      borderRadius: 8,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      textDecoration: 'none',
+                      boxShadow: '0 2px 4px rgba(37,99,235,0.2)'
+                    }}
+                  >
+                    Fijar ruta en Google Maps
+                  </a>
+
+                  <button
+                    onClick={() => {
+                      const store = useAppStore.getState()
+                      store.setViewMode('list')
+                      // After the view switches and React renders the list, scroll to the station
+                      setTimeout(() => {
+                        const el = document.getElementById(`station-${station.idEstacion}`)
+                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                      }, 350)
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      width: '100%',
+                      marginTop: 6,
+                      padding: '8px',
+                      background: '#f1f5f9',
+                      color: '#2563eb',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: 8,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    📋 Ver en lista
+                  </button>
                 </div>
-
-                <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.5, marginBottom: 10 }}>
-                  <p>{station.direccion}</p>
-                  <p style={{ display: 'flex', alignItems: 'center', gap: 4 }}>{station.horario}</p>
-                  {shouldShowLastUpdate(station.lastUpdate) && (
-                    <p style={{ color: '#d97706', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                      <Calendar size={12} />
-                      {formatLastUpdate(station.lastUpdate)}
-                    </p>
-                  )}
-                </div>
-
-                <a
-                  href={`https://www.google.com/maps/dir/?api=1&destination=${station.latitud},${station.longitud}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 8,
-                    width: '100%',
-                    padding: '8px',
-                    background: '#2563eb',
-                    color: 'white',
-                    borderRadius: 8,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    textDecoration: 'none',
-                    boxShadow: '0 2px 4px rgba(37,99,235,0.2)'
-                  }}
-                >
-                  Fijar ruta en Google Maps
-                </a>
-
-                <button
-                  onClick={() => {
-                    const store = useAppStore.getState()
-                    store.setViewMode('list')
-                    // After the view switches and React renders the list, scroll to the station
-                    setTimeout(() => {
-                      const el = document.getElementById(`station-${station.idEstacion}`)
-                      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                    }, 350)
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 6,
-                    width: '100%',
-                    marginTop: 6,
-                    padding: '8px',
-                    background: '#f1f5f9',
-                    color: '#2563eb',
-                    border: '2px solid #e2e8f0',
-                    borderRadius: 8,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                  }}
-                >
-                  📋 Ver en lista
-                </button>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
+              </Popup>
+            </Marker>
+          ))}
+        </MarkerClusterGroup>
       </MapContainer>
     </div>
   )
