@@ -1,9 +1,26 @@
+import { useRef, useEffect } from 'react'
+import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
 import { useAppStore } from '../store/useAppStore'
 import { StationCard } from './StationCard'
 import { LoadingSkeleton } from './LoadingSkeleton'
 
 export const StationList = () => {
   const { filteredStations, isLoading, selectedStationId, setSelectedStationId, setViewMode } = useAppStore()
+  const virtuosoRef = useRef<VirtuosoHandle>(null)
+
+  // Auto-scroll to selected station when it changes (e.g. from map click)
+  useEffect(() => {
+    if (selectedStationId && filteredStations.length > 0) {
+      const index = filteredStations.findIndex(s => s.idEstacion === selectedStationId)
+      if (index !== -1) {
+        virtuosoRef.current?.scrollToIndex({
+          index,
+          align: 'center',
+          behavior: 'smooth'
+        })
+      }
+    }
+  }, [selectedStationId, filteredStations])
 
   if (isLoading) {
     return <LoadingSkeleton />
@@ -38,16 +55,23 @@ export const StationList = () => {
         </h2>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 space-y-3 overscroll-contain touch-pan-y" style={{ WebkitOverflowScrolling: 'touch' }}>
-        {filteredStations.map((station) => (
-          <div key={station.idEstacion} id={`station-${station.idEstacion}`}>
-            <StationCard
-              station={station}
-              isSelected={selectedStationId === station.idEstacion}
-              onClick={() => setSelectedStationId(station.idEstacion)}
-            />
-          </div>
-        ))}
+      <div className="flex-1 min-h-0 bg-slate-50">
+        <Virtuoso
+          ref={virtuosoRef}
+          data={filteredStations}
+          initialTopMostItemIndex={selectedStationId ? filteredStations.findIndex(s => s.idEstacion === selectedStationId) : 0}
+          itemContent={(_index, station) => (
+            <div className="p-2 pb-1">
+              <StationCard
+                station={station}
+                isSelected={selectedStationId === station.idEstacion}
+                onClick={() => setSelectedStationId(station.idEstacion)}
+              />
+            </div>
+          )}
+          style={{ height: '100%' }}
+          className="custom-scrollbar"
+        />
       </div>
     </div>
   )

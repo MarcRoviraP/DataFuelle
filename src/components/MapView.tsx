@@ -504,11 +504,7 @@ export const MapView = () => {
                     onClick={() => {
                       const store = useAppStore.getState()
                       store.setViewMode('list')
-                      // After the view switches and React renders the list, scroll to the station
-                      setTimeout(() => {
-                        const el = document.getElementById(`station-${station.idEstacion}`)
-                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                      }, 350)
+                      store.setSelectedStationId(station.idEstacion)
                     }}
                     style={{
                       display: 'flex',

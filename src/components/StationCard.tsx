@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import { fetchStationHistory, type Station } from '../services/api'
 import { MapPin, Clock, Navigation, Tag, Calendar, TrendingUp, ChevronDown, ChevronUp } from 'lucide-react'
 import { shouldShowLastUpdate, formatLastUpdate } from '../utils/date'
@@ -155,9 +155,10 @@ function LineChart({ data, fuelKey }: { data: any[]; fuelKey: string }) {
   )
 }
 
-export const StationCard = ({ station, isSelected, onClick }: StationCardProps) => {
-  const { stationDiscounts, setStationDiscount, selectedFuelTypeId } = useAppStore()
-  const currentDiscount = stationDiscounts.get(station.idEstacion) || 0
+export const StationCard = memo(({ station, isSelected, onClick }: StationCardProps) => {
+  const currentDiscount = useAppStore(state => state.stationDiscounts.get(station.idEstacion) || 0)
+  const setStationDiscount = useAppStore(state => state.setStationDiscount)
+  const selectedFuelTypeId = useAppStore(state => state.selectedFuelTypeId)
 
   const [showHistory, setShowHistory] = useState(false)
   const [activeDays, setActiveDays] = useState<number | null>(7)
@@ -370,6 +371,6 @@ export const StationCard = ({ station, isSelected, onClick }: StationCardProps) 
       </div>
     </div>
   )
-}
+})
 
 
