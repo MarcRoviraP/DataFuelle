@@ -18,22 +18,30 @@ function App() {
   const selectedFuelName = fuelTypes.find(f => f.idFuelType === selectedFuelTypeId)?.fuelTypeName || 'Combustible'
 
   useEffect(() => {
-    // Try to get user's location on mount
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setCurrentLocation(position.coords.latitude, position.coords.longitude)
-        },
-        (error) => {
-          console.error('Error getting location:', error)
-          // Fallback to Valencia if denied or fails
-          setCurrentLocation(39.4699, -0.3763)
-        }
-      )
-    } else {
-      // Fallback if not supported
-      setCurrentLocation(39.4699, -0.3763)
+    const initApp = async () => {
+      const store = useAppStore.getState()
+      
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            setCurrentLocation(position.coords.latitude, position.coords.longitude)
+            // Immediately fetch stations once location is set
+            await store.fetchStations()
+          },
+          async (error) => {
+            console.error('Error getting location:', error)
+            setCurrentLocation(39.4699, -0.3763)
+            await store.fetchStations()
+          },
+          { timeout: 10000 }
+        )
+      } else {
+        setCurrentLocation(39.4699, -0.3763)
+        await store.fetchStations()
+      }
     }
+
+    initApp()
   }, [setCurrentLocation])
 
   return (

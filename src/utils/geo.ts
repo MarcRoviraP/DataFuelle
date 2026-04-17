@@ -25,12 +25,10 @@ export const geocodeAddress = async (query: string): Promise<{ lat: number; lon:
     url.searchParams.append('q', query)
     url.searchParams.append('format', 'json')
     url.searchParams.append('limit', '1')
+    url.searchParams.append('countrycodes', 'es') // Limit to Spain
     
-    // According to Nominatim usage policy, a custom User-Agent should be provided
     const response = await fetch(url.toString(), {
-      headers: {
-        'User-Agent': 'GasolinerasApp/1.0 (test)'
-      }
+      headers: { 'User-Agent': 'GasolinerasApp/1.0' }
     })
     
     const data = await response.json()
@@ -44,4 +42,26 @@ export const geocodeAddress = async (query: string): Promise<{ lat: number; lon:
     console.error('Geocoding error:', error)
   }
   return null
+}
+
+export const fetchSuggestions = async (query: string): Promise<any[]> => {
+  if (!query || query.length < 3) return []
+  
+  try {
+    const url = new URL('https://nominatim.openstreetmap.org/search')
+    url.searchParams.append('q', query)
+    url.searchParams.append('format', 'json')
+    url.searchParams.append('limit', '5')
+    url.searchParams.append('addressdetails', '1')
+    url.searchParams.append('countrycodes', 'es') // Limit to Spain
+    
+    const response = await fetch(url.toString(), {
+      headers: { 'User-Agent': 'GasolinerasApp/1.0' }
+    })
+    
+    return await response.json()
+  } catch (error) {
+    console.error('Suggestions error:', error)
+    return []
+  }
 }

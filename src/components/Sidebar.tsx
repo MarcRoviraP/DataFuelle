@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAppStore } from '../store/useAppStore'
-import { geocodeAddress } from '../utils/geo'
-import { Search, MapPin, Fuel, Navigation, History, Filter } from 'lucide-react'
+import { fetchSuggestions, geocodeAddress } from '../utils/geo'
+import { Search, MapPin, Fuel, Navigation, History, Filter, X, Clock, Tag } from 'lucide-react'
 
 export const Sidebar = () => {
   const {
@@ -28,14 +28,43 @@ export const Sidebar = () => {
   } = useAppStore()
 
   const [searchQuery, setSearchQuery] = useState('')
+  const [suggestions, setSuggestions] = useState<any[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const debounceRef = useRef<number | null>(null)
 
-  // Auto-fetch on mount/location change if no stations yet
-  useEffect(() => {
-    if (currentLocation && stations.length === 0 && !isLoading) {
-      handleSearch()
+
+  // Handle autocomplete input changes
+  const handleInputChange = (val: string) => {
+    setSearchQuery(val)
+    
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    
+    if (val.length < 3) {
+      setSuggestions([])
+      setShowSuggestions(false)
+      return
     }
-  }, [currentLocation])
 
+    debounceRef.current = window.setTimeout(async () => {
+      const results = await fetchSuggestions(val)
+      setSuggestions(results)
+      setShowSuggestions(results.length > 0)
+    }, 400)
+  }
+
+  const handleSelectSuggestion = (suggestion: any) => {
+    const { lat, lon, display_name } = suggestion
+    const simpleName = display_name.split(',')[0]
+    
+    setSearchQuery(simpleName)
+    setSuggestions([])
+    setShowSuggestions(false)
+    setCurrentLocation(parseFloat(lat), parseFloat(lon))
+    addToHistory(simpleName)
+    
+    // Explicitly call fetchStations via store action
+    setTimeout(() => useAppStore.getState().fetchStations(), 100)
+  }
 
   const handleSearch = async (overrideQuery?: string) => {
     const query = overrideQuery ?? searchQuery;
@@ -46,6 +75,7 @@ export const Sidebar = () => {
       if (coords) {
         setCurrentLocation(coords.lat, coords.lon)
         if (query) addToHistory(query)
+        setShowSuggestions(false)
       } else {
         alert('No se ha podido encontrar la ubicación del municipio o CP especificado.')
         useAppStore.getState().setIsLoading(false)
@@ -120,7 +150,7 @@ export const Sidebar = () => {
             <h2>Búsqueda y Ubicación</h2>
           </div>
 
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 relative">
             <button
               onClick={handleGeoLocation}
               className="flex items-center justify-center gap-2 w-full py-3 bg-blue-50 text-blue-700 font-bold rounded-xl border-2 border-dashed border-blue-200 hover:bg-blue-100 hover:border-blue-300 transition-all active:scale-[0.98] duration-200 group"
@@ -145,8 +175,21 @@ export const Sidebar = () => {
                 placeholder="Municipio o CP (Ej: Valencia)"
                 className="w-full pl-11 pr-12 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white transition-all text-slate-700 placeholder:text-slate-400 font-semibold shadow-sm"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => handleInputChange(e.target.value)}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true) }}
               />
+              
+              {searchQuery && (
+                <button 
+                  type="button"
+                  onClick={() => handleInputChange('')}
+                  className="absolute right-12 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              )}
+
               <button
                 type="submit"
                 className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:scale-95 transition-all shadow-lg shadow-blue-200"
@@ -155,154 +198,188 @@ export const Sidebar = () => {
                 <Search size={18} />
               </button>
             </form>
-          </div>
-        </section>
 
-        <section className="space-y-4 pt-2 border-t border-slate-100">
-          <div className="flex items-center gap-2 text-slate-800 font-bold px-1 border-l-4 border-blue-500">
-            <Filter size={18} />
-            <h2>Filtros Avanzados</h2>
-          </div>
-
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">
-                Tipo de combustible
-              </label>
-              <select
-                className="w-full p-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-blue-400 transition-all appearance-none cursor-pointer text-slate-700 font-semibold pr-10 relative"
-                value={selectedFuelTypeId}
-                onChange={(e) => handleFuelChange(Number(e.target.value))}
-              >
-                {fuelTypes.map((type: any) => (
-                  <option key={type.idFuelType} value={type.idFuelType}>
-                    {type.fuelTypeName}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">
-                Ordenar por
-              </label>
-              <select
-                className="w-full p-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-blue-400 transition-all appearance-none cursor-pointer text-slate-700 font-semibold pr-10 relative"
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as 'price' | 'distance' | 'smart')}
-              >
-                <option value="smart">Smart (Equilibrado)</option>
-                <option value="price">Precio (Económico)</option>
-                <option value="distance">Proximidad</option>
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">
-                Marcas principales
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {['REPSOL', 'CEPSA', 'BP', 'GALP', 'SHELL'].map((brand) => (
+            {/* Autocomplete Dropdown */}
+            {showSuggestions && (
+              <div className="absolute top-[100%] left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl border border-slate-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                {suggestions.map((s, i) => (
                   <button
-                    key={brand}
-                    onClick={() => {
-                      if (selectedBrands.includes(brand)) {
-                        setSelectedBrands(selectedBrands.filter((b) => b !== brand))
-                      } else {
-                        setSelectedBrands([...selectedBrands, brand])
-                      }
-                    }}
-                    className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all ${
-                      selectedBrands.includes(brand)
-                        ? 'bg-blue-600 text-white shadow-md'
-                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                    }`}
+                    key={i}
+                    onClick={() => handleSelectSuggestion(s)}
+                    className="w-full text-left px-5 py-3.5 hover:bg-blue-50 transition-colors flex items-start gap-3 border-b border-slate-50 last:border-none group/item"
                   >
-                    {brand}
+                    <div className="mt-0.5 p-1.5 bg-slate-100 group-hover/item:bg-blue-100 text-slate-400 group-hover/item:text-blue-600 rounded-lg transition-colors">
+                      <MapPin size={14} />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-bold text-slate-700">{s.display_name.split(',')[0]}</span>
+                      <span className="text-[10px] text-slate-400 font-medium line-clamp-1 italic">{s.display_name.split(',').slice(1).join(',')}</span>
+                    </div>
                   </button>
                 ))}
               </div>
-            </div>
+            )}
+          </div>
+        </section>
 
-            <div className="flex items-center justify-between px-1">
-              <label className="text-sm font-bold text-slate-700">
-                Abierto ahora
-              </label>
+        {/* Fuel Type Section */}
+        <section className="space-y-4 pt-2 border-t border-slate-100">
+          <div className="flex items-center gap-2 text-slate-800 font-bold px-1 border-l-4 border-blue-500">
+            <Fuel size={18} />
+            <h2>Carburante</h2>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { id: 9, name: '95' },
+              { id: 12, name: '98' },
+              { id: 6, name: 'Diesel' }
+            ].map((type) => (
               <button
-                onClick={() => setShowOnlyOpen(!showOnlyOpen)}
-                className={`w-12 h-6 rounded-full p-1 transition-colors ${
-                  showOnlyOpen ? 'bg-blue-500' : 'bg-slate-300'
+                key={type.id}
+                onClick={() => handleFuelChange(type.id)}
+                className={`py-2.5 px-3 rounded-xl text-xs font-black transition-all border-2 flex flex-col items-center justify-center gap-1 ${
+                  selectedFuelTypeId === type.id
+                    ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-200 scale-[1.02]'
+                    : 'bg-white border-slate-100 text-slate-500 hover:border-blue-200 hover:text-blue-500'
                 }`}
               >
-                <div
-                  className={`w-4 h-4 rounded-full bg-white transition-transform ${
-                    showOnlyOpen ? 'translate-x-6' : 'translate-x-0'
-                  }`}
-                />
+                <span className="leading-none">{type.name}</span>
+                {selectedFuelTypeId === type.id && <div className="w-1 h-1 bg-white rounded-full animate-pulse" />}
               </button>
-            </div>
+            ))}
+          </div>
+        </section>
 
-            <div className="flex items-center justify-between px-1">
-              <label className="text-sm font-bold text-slate-700">
-                Actualizadas hoy
-              </label>
-              <button
-                onClick={() => setShowOnlyUpdatedToday(!showOnlyUpdatedToday)}
-                className={`w-12 h-6 rounded-full p-1 transition-colors ${
-                  showOnlyUpdatedToday ? 'bg-green-500' : 'bg-slate-300'
-                }`}
-              >
-                <div
-                  className={`w-4 h-4 rounded-full bg-white transition-transform ${
-                    showOnlyUpdatedToday ? 'translate-x-6' : 'translate-x-0'
-                  }`}
-                />
-              </button>
+        {/* Radius Section */}
+        <section className="space-y-4 pt-2 border-t border-slate-100">
+          <div className="flex justify-between items-center px-1">
+            <div className="flex items-center gap-2 text-slate-800 font-bold border-l-4 border-blue-500 pl-1">
+              <Filter size={18} />
+              <h2>Radio de búsqueda</h2>
             </div>
-
-            <div className="space-y-3 pt-2">
-              <div className="flex justify-between items-center px-1">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  Radio de búsqueda
-                </label>
-                <span className="text-sm font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg">
-                  {radius} km
-                </span>
-              </div>
-              <input
-                type="range"
-                min="1"
-                max="100"
-                step="1"
-                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600 hover:accent-blue-700 transition-all"
-                value={radius}
-                onChange={(e) => handleRadiusChange(Number(e.target.value))}
-              />
-              <div className="flex justify-between text-[10px] text-slate-400 font-bold px-1">
-                <span>1KM</span>
-                <span>100KM</span>
-              </div>
+            <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-black border border-blue-100">
+              {radius} km
+            </span>
+          </div>
+          <div className="px-2">
+            <input
+              type="range"
+              min="1"
+              max="50"
+              step="1"
+              value={radius}
+              onChange={(e) => handleRadiusChange(parseInt(e.target.value))}
+              className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
+            />
+            <div className="flex justify-between mt-2 text-[10px] font-bold text-slate-400 px-1 uppercase tracking-tighter">
+              <span>1 km</span>
+              <span>25 km</span>
+              <span>50 km</span>
             </div>
           </div>
         </section>
 
-        {/* Search History Section */}
+        {/* Status Toggles */}
+        <section className="space-y-3 pt-2 border-t border-slate-100">
+          <div className="flex items-center gap-2 text-slate-800 font-bold px-1 border-l-4 border-blue-500 mb-4">
+            <Filter size={18} />
+            <h2>Estado y Actualización</h2>
+          </div>
+          
+          <label className="flex items-center justify-between p-3.5 bg-slate-50 border-2 border-slate-100 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors group">
+            <div className="flex flex-col">
+              <span className="text-sm font-bold text-slate-700">Abierta ahora</span>
+              <span className="text-[10px] text-slate-400 font-medium">Solo estaciones en servicio</span>
+            </div>
+            <div className="relative inline-flex items-center cursor-pointer">
+              <input 
+                type="checkbox" 
+                className="sr-only peer" 
+                checked={showOnlyOpen}
+                onChange={(e) => setShowOnlyOpen(e.target.checked)}
+              />
+              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+            </div>
+          </label>
+
+          <label className="flex items-center justify-between p-3.5 bg-slate-50 border-2 border-slate-100 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors group">
+            <div className="flex flex-col">
+              <span className="text-sm font-bold text-slate-700">Actualizada hoy</span>
+              <span className="text-[10px] text-slate-400 font-medium">Precios subidos recientemente</span>
+            </div>
+             <div className="relative inline-flex items-center cursor-pointer">
+              <input 
+                type="checkbox" 
+                className="sr-only peer" 
+                checked={showOnlyUpdatedToday}
+                onChange={(e) => setShowOnlyUpdatedToday(e.target.checked)}
+              />
+              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+            </div>
+          </label>
+        </section>
+
+        {/* Brands Section */}
+        <section className="space-y-4 pt-2 border-t border-slate-100">
+          <div className="flex items-center gap-2 text-slate-800 font-bold px-1 border-l-4 border-blue-500">
+            <Tag size={18} />
+            <h2>Marcas Populares</h2>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {['REPSOL', 'CEPSA', 'BP', 'SHELL', 'PLENOIL', 'GALP'].map((brand) => (
+              <button
+                key={brand}
+                onClick={() => {
+                  const isBrandSelected = selectedBrands.includes(brand)
+                  const newBrands = isBrandSelected
+                    ? selectedBrands.filter(b => b !== brand)
+                    : [...selectedBrands, brand]
+                  
+                  setSelectedBrands(newBrands)
+                  
+                  // If we have a location but no stations (or we want fresh data), fetch!
+                  if (currentLocation && (stations.length === 0 || !isBrandSelected)) {
+                    useAppStore.getState().fetchStations()
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border-2 ${
+                  selectedBrands.includes(brand)
+                    ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
+                    : 'bg-white border-slate-100 text-slate-400 hover:border-blue-100'
+                }`}
+              >
+                {brand}
+              </button>
+            ))}
+          </div>
+          {selectedBrands.length > 0 && (
+            <button
+              onClick={() => setSelectedBrands([])}
+              className="w-full py-2 text-xs font-bold text-red-500 bg-red-50 hover:bg-red-100 rounded-xl transition-colors border border-dashed border-red-200"
+            >
+              Limpiar filtros de marcas
+            </button>
+          )}
+        </section>
+
+        {/* History Section */}
         {searchHistory.length > 0 && (
-          <section className="space-y-4 pt-2 border-t border-slate-100">
+          <section className="space-y-4 pt-2 border-t border-slate-100 pb-12">
             <div className="flex items-center gap-2 text-slate-800 font-bold px-1 border-l-4 border-blue-500">
               <History size={18} />
-              <h2>Recientes</h2>
+              <h2>Búsquedas Recientes</h2>
             </div>
             <div className="flex flex-wrap gap-2">
               {searchHistory.map((h, i) => (
                 <button
                   key={i}
-                  className="px-3 py-1.5 bg-slate-100 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-200 transition-colors"
+                  className="px-3 py-2 bg-slate-50 text-slate-600 text-xs font-bold rounded-xl border border-slate-100 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all flex items-center gap-2"
                   onClick={() => {
-                    setSearchQuery(h)
                     handleSearch(h)
+                    setSearchQuery(h)
                   }}
                 >
+                  <Search size={12} />
                   {h}
                 </button>
               ))}
@@ -310,7 +387,6 @@ export const Sidebar = () => {
           </section>
         )}
       </div>
-
     </aside>
   )
 }

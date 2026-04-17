@@ -150,63 +150,50 @@ const fmt = (v: number | null | undefined) =>
 
 export const MapView = () => {
   const { filteredStations, currentLocation, selectedFuelTypeId, selectedStationId, stationDiscounts, radius, isLoading } = useAppStore()
-  const [visibleStations, setVisibleStations] = useState<any[]>([])
   const [visualRadius, setVisualRadius] = useState<number>(0)
   const defaultCenter: [number, number] = [39.4699, -0.3763]
   const markerRefs = useRef<Map<number, L.Marker>>(new Map())
   const sweepIntervalRef = useRef<number | null>(null)
+  const lastSearchRef = useRef<{ lat: number, lon: number, radius: number } | null>(null)
 
-  // Radar Sweep Animation (Optimized for High Volume)
+  // Purely visual Radar Sweep Animation
   useEffect(() => {
     if (!currentLocation) {
       setVisualRadius(0)
-      setVisibleStations([])
+      lastSearchRef.current = null
       return
     }
 
-    // Reset and start sweep immediately on location change
-    setVisualRadius(0)
-    setVisibleStations([])
+    const isNewSearch = !lastSearchRef.current || 
+      lastSearchRef.current.lat !== currentLocation.lat || 
+      lastSearchRef.current.lon !== currentLocation.lon ||
+      lastSearchRef.current.radius !== radius
 
+    if (!isNewSearch) return
+
+    lastSearchRef.current = { lat: currentLocation.lat, lon: currentLocation.lon, radius }
+    setVisualRadius(0)
+    
     if (sweepIntervalRef.current) {
       cancelAnimationFrame(sweepIntervalRef.current)
     }
 
-    // Optimization: Pre-sort stations by distance ONCE to avoid O(N) filtering in every frame
-    const sortedStations = [...filteredStations].sort((a, b) => (a.distancia || 0) - (b.distancia || 0))
-    let lastInviewIndex = 0
-
     const target = radius
-    const duration = 1200 // Sweep duration
+    const duration = 1200
     const start = performance.now()
 
     const animateSweep = (now: number) => {
       const elapsed = now - start
       const progress = Math.min(elapsed / duration, 1)
-      
       const easeOutQuad = (t: number) => t * (2 - t)
       const easedProgress = easeOutQuad(progress)
       
-      const nextRadius = easedProgress * target
-      setVisualRadius(nextRadius)
-
-      // Pointer-based discovery: highly efficient for thousands of stations
-      let newIndex = lastInviewIndex
-      while (newIndex < sortedStations.length && (sortedStations[newIndex].distancia || 0) <= nextRadius) {
-        newIndex++
-      }
-
-      // Only update state if we actually discovered new stations
-      if (newIndex !== lastInviewIndex) {
-        lastInviewIndex = newIndex
-        setVisibleStations(sortedStations.slice(0, newIndex))
-      }
+      setVisualRadius(easedProgress * target)
 
       if (progress < 1) {
         sweepIntervalRef.current = requestAnimationFrame(animateSweep)
       } else {
         setVisualRadius(target)
-        if (!isLoading) setVisibleStations(filteredStations)
       }
     }
 
@@ -215,7 +202,7 @@ export const MapView = () => {
     return () => {
       if (sweepIntervalRef.current) cancelAnimationFrame(sweepIntervalRef.current)
     }
-  }, [currentLocation, radius, filteredStations, isLoading])
+  }, [currentLocation?.lat, currentLocation?.lon, radius])
 
   // Memoize average price and icon generator to avoid overhead during sweep
   const prices = useMemo(() => filteredStations.map(s => s.precioCombustible).filter(p => p > 0), [filteredStations])
@@ -379,7 +366,7 @@ export const MapView = () => {
           spiderfyOnMaxZoom={true}
           showCoverageOnHover={false}
         >
-          {visibleStations.map((station) => (
+          {filteredStations.map((station) => (
             <Marker
               key={station.idEstacion}
               position={[station.latitud, station.longitud]}
