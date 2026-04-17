@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { useAppStore } from '../store/useAppStore'
-import { fetchStationsByRadius, fetchRecentPriceChanges } from '../services/api'
 import { geocodeAddress } from '../utils/geo'
 import { Search, MapPin, Fuel, Navigation, History, Filter } from 'lucide-react'
 
@@ -14,7 +13,6 @@ export const Sidebar = () => {
     setSelectedFuelTypeId,
     fuelTypes,
     stations,
-    setStations,
     searchHistory,
     addToHistory,
     isLoading,

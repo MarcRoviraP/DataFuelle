@@ -1,4 +1,4 @@
-import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMap, useMapEvents, LayersControl, ZoomControl, Circle } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents, LayersControl, ZoomControl, Circle } from 'react-leaflet'
 import MarkerClusterGroup from 'react-leaflet-cluster'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
@@ -66,55 +66,6 @@ const MapEvents = () => {
   return null
 }
 
-const SonarEffect = ({ lat, lon, radius, isLoading }: { lat: number, lon: number, radius: number, isLoading: boolean }) => {
-  if (!isLoading) return null;
-
-  return (
-    <>
-      {/* Three expanding rings for a "shockwave" effect */}
-      {[0, 1, 2].map((i) => (
-        <Circle
-          key={`sonar-${i}-${lat}-${lon}`}
-          center={[lat, lon]}
-          radius={radius * 1000}
-          pathOptions={{
-            fillColor: '#3b82f6',
-            fillOpacity: 0,
-            color: '#3b82f6',
-            weight: 2,
-            opacity: 0,
-          }}
-          eventHandlers={{
-            add: (e) => {
-              const path = e.target._path;
-              if (path) {
-                path.style.animation = `sonar-expand 1.5s infinite ${i * 0.4}s cubic-bezier(0.215, 0.61, 0.355, 1)`;
-              }
-            }
-          }}
-        />
-      ))}
-      <style>{`
-        @keyframes sonar-expand {
-          0% {
-            transform: scale(0);
-            opacity: 1;
-            stroke-width: 6;
-          }
-          100% {
-            transform: scale(1.1);
-            opacity: 0;
-            stroke-width: 0.5;
-          }
-        }
-        path.leaflet-interactive {
-          transform-origin: center;
-          transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-      `}</style>
-    </>
-  );
-};
 
 const MapController = ({ center }: { center: { lat: number; lon: number } | null }) => {
   const map = useMap()
