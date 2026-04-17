@@ -1,4 +1,4 @@
-import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMap, useMapEvents, LayersControl, ZoomControl } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMap, useMapEvents, LayersControl, ZoomControl, Circle } from 'react-leaflet'
 import MarkerClusterGroup from 'react-leaflet-cluster'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
@@ -7,7 +7,7 @@ const { BaseLayer } = LayersControl
 import { useAppStore } from '../store/useAppStore'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react'
 import { LocateFixed, Calendar } from 'lucide-react'
 import { shouldShowLastUpdate, formatLastUpdate } from '../utils/date'
 
@@ -29,11 +29,14 @@ const DefaultIcon = L.icon({
 const LocationIcon = L.divIcon({
   className: '',
   html: `
-    <div style="position:relative;width:36px;height:36px;display:flex;align-items:center;justify-content:center;">
-      <div style="position:absolute;width:36px;height:36px;border-radius:50%;background:rgba(37,99,235,0.2);animation:pulse 1.8s ease-out infinite;"></div>
-      <div style="width:18px;height:18px;border-radius:50%;background:#2563eb;border:3px solid #fff;box-shadow:0 2px 8px rgba(37,99,235,0.6);z-index:1;"></div>
+    <div style="position:relative;width:36px;height:36px;display:flex;align-items:center;justify-content:center;animation:marker-pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+      <div style="position:absolute;width:36px;height:36px;border-radius:50%;background:rgba(37,99,235,0.3);animation:pulse 2s ease-out infinite;"></div>
+      <div style="width:18px;height:18px;border-radius:50%;background:#2563eb;border:3px solid #fff;box-shadow:0 2px 12px rgba(37,99,235,0.8);z-index:1;"></div>
     </div>
-    <style>@keyframes pulse{0%{transform:scale(0.8);opacity:1}100%{transform:scale(2.2);opacity:0}}</style>
+    <style>
+      @keyframes pulse{0%{transform:scale(0.8);opacity:1}100%{transform:scale(3);opacity:0}}
+      @keyframes marker-pop{0%{transform:scale(0) translateY(-20px);opacity:0}100%{transform:scale(1) translateY(0);opacity:1}}
+    </style>
   `,
   iconSize: [36, 36],
   iconAnchor: [18, 18],
@@ -62,6 +65,56 @@ const MapEvents = () => {
   })
   return null
 }
+
+const SonarEffect = ({ lat, lon, radius, isLoading }: { lat: number, lon: number, radius: number, isLoading: boolean }) => {
+  if (!isLoading) return null;
+
+  return (
+    <>
+      {/* Three expanding rings for a "shockwave" effect */}
+      {[0, 1, 2].map((i) => (
+        <Circle
+          key={`sonar-${i}-${lat}-${lon}`}
+          center={[lat, lon]}
+          radius={radius * 1000}
+          pathOptions={{
+            fillColor: '#3b82f6',
+            fillOpacity: 0,
+            color: '#3b82f6',
+            weight: 2,
+            opacity: 0,
+          }}
+          eventHandlers={{
+            add: (e) => {
+              const path = e.target._path;
+              if (path) {
+                path.style.animation = `sonar-expand 1.5s infinite ${i * 0.4}s cubic-bezier(0.215, 0.61, 0.355, 1)`;
+              }
+            }
+          }}
+        />
+      ))}
+      <style>{`
+        @keyframes sonar-expand {
+          0% {
+            transform: scale(0);
+            opacity: 1;
+            stroke-width: 6;
+          }
+          100% {
+            transform: scale(1.1);
+            opacity: 0;
+            stroke-width: 0.5;
+          }
+        }
+        path.leaflet-interactive {
+          transform-origin: center;
+          transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+      `}</style>
+    </>
+  );
+};
 
 const MapController = ({ center }: { center: { lat: number; lon: number } | null }) => {
   const map = useMap()
@@ -145,15 +198,79 @@ const fmt = (v: number | null | undefined) =>
   v && v > 0 ? `${v.toFixed(3)} €/L` : '—'
 
 export const MapView = () => {
-  const { filteredStations, currentLocation, selectedFuelTypeId, selectedStationId, stationDiscounts } = useAppStore()
+  const { filteredStations, currentLocation, selectedFuelTypeId, selectedStationId, stationDiscounts, radius, isLoading } = useAppStore()
+  const [visibleStations, setVisibleStations] = useState<any[]>([])
+  const [visualRadius, setVisualRadius] = useState<number>(0)
   const defaultCenter: [number, number] = [39.4699, -0.3763]
   const markerRefs = useRef<Map<number, L.Marker>>(new Map())
+  const sweepIntervalRef = useRef<number | null>(null)
 
-  // Calculate average price for dynamic coloring
-  const prices = filteredStations.map(s => s.precioCombustible).filter(p => p > 0)
-  const averagePrice = prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : 0
+  // Radar Sweep Animation (Optimized for High Volume)
+  useEffect(() => {
+    if (!currentLocation) {
+      setVisualRadius(0)
+      setVisibleStations([])
+      return
+    }
 
-  const getPriceIcon = (price: number, isSelected: boolean) => {
+    // Reset and start sweep immediately on location change
+    setVisualRadius(0)
+    setVisibleStations([])
+
+    if (sweepIntervalRef.current) {
+      cancelAnimationFrame(sweepIntervalRef.current)
+    }
+
+    // Optimization: Pre-sort stations by distance ONCE to avoid O(N) filtering in every frame
+    const sortedStations = [...filteredStations].sort((a, b) => (a.distancia || 0) - (b.distancia || 0))
+    let lastInviewIndex = 0
+
+    const target = radius
+    const duration = 1200 // Sweep duration
+    const start = performance.now()
+
+    const animateSweep = (now: number) => {
+      const elapsed = now - start
+      const progress = Math.min(elapsed / duration, 1)
+      
+      const easeOutQuad = (t: number) => t * (2 - t)
+      const easedProgress = easeOutQuad(progress)
+      
+      const nextRadius = easedProgress * target
+      setVisualRadius(nextRadius)
+
+      // Pointer-based discovery: highly efficient for thousands of stations
+      let newIndex = lastInviewIndex
+      while (newIndex < sortedStations.length && (sortedStations[newIndex].distancia || 0) <= nextRadius) {
+        newIndex++
+      }
+
+      // Only update state if we actually discovered new stations
+      if (newIndex !== lastInviewIndex) {
+        lastInviewIndex = newIndex
+        setVisibleStations(sortedStations.slice(0, newIndex))
+      }
+
+      if (progress < 1) {
+        sweepIntervalRef.current = requestAnimationFrame(animateSweep)
+      } else {
+        setVisualRadius(target)
+        if (!isLoading) setVisibleStations(filteredStations)
+      }
+    }
+
+    sweepIntervalRef.current = requestAnimationFrame(animateSweep)
+
+    return () => {
+      if (sweepIntervalRef.current) cancelAnimationFrame(sweepIntervalRef.current)
+    }
+  }, [currentLocation, radius, filteredStations, isLoading])
+
+  // Memoize average price and icon generator to avoid overhead during sweep
+  const prices = useMemo(() => filteredStations.map(s => s.precioCombustible).filter(p => p > 0), [filteredStations])
+  const averagePrice = useMemo(() => prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : 0, [prices])
+
+  const getPriceIcon = useCallback((price: number, isSelected: boolean) => {
     let color = '#64748b' // Default slate
     
     if (price > 0 && averagePrice > 0) {
@@ -185,7 +302,7 @@ export const MapView = () => {
       iconSize: [60, 24],
       iconAnchor: [30, 12],
     })
-  }
+  }, [averagePrice])
 
   const createClusterCustomIcon = (cluster: any) => {
     const markers = cluster.getAllChildMarkers()
@@ -244,6 +361,7 @@ export const MapView = () => {
         className="w-full h-full"
         attributionControl={false}
         zoomControl={false}
+        preferCanvas={true} // High-performance graphics: uses Canvas instead of SVG for paths/circles
       >
         <ZoomControl position="bottomright" />
         <LayersControl position="topright">
@@ -255,8 +373,8 @@ export const MapView = () => {
           </BaseLayer>
           <BaseLayer name="Satélite">
             <TileLayer
-              attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EBP, and the GIS User Community'
-              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+              attribution='&copy; CNES, Distribution Airbus DS, © Airbus DS, © PlanetObserver (Contains Copernicus Data) | &copy; <a href="https://www.stadiamaps.com/" target="_blank">Stadia Maps</a> &copy; <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://tiles.stadiamaps.com/tiles/alidade_satellite/{z}/{x}/{y}{r}.jpg"
             />
           </BaseLayer>
         </LayersControl>
@@ -266,20 +384,51 @@ export const MapView = () => {
         <MarkerOpener stationId={selectedStationId} markerRefs={markerRefs} />
 
         {currentLocation && (
-          <Marker position={[currentLocation.lat, currentLocation.lon]} icon={LocationIcon}>
+          <>
+            <Marker position={[currentLocation.lat, currentLocation.lon]} icon={LocationIcon} zIndexOffset={1000} />
             
-          </Marker>
+            {/* The expanding Radar Ring */}
+            <Circle
+              center={[currentLocation.lat, currentLocation.lon]}
+              radius={visualRadius * 1000}
+              pathOptions={{
+                fillColor: '#3b82f6',
+                fillOpacity: 0.12,
+                color: '#2563eb',
+                weight: 2,
+                opacity: 0.7,
+              }}
+              key={`radar-ring-${currentLocation.lat}-${currentLocation.lon}`}
+            />
+
+            {/* Faint search limit circle */}
+            {!isLoading && visualRadius < radius && (
+              <Circle
+                center={[currentLocation.lat, currentLocation.lon]}
+                radius={radius * 1000}
+                pathOptions={{
+                  fillColor: '#94a3b8',
+                  fillOpacity: 0.05,
+                  color: '#cbd5e1',
+                  weight: 1,
+                  opacity: 0.3,
+                }}
+              />
+            )}
+          </>
         )}
 
         <MarkerClusterGroup
-          chunkedLoading
+          chunkedLoading={true}
+          chunkInterval={100} // Process markers in smaller chunks
+          chunkDelay={50}     // Add delay between chunks to let UI breathe
           iconCreateFunction={createClusterCustomIcon}
           disableClusteringAtZoom={14}
           maxClusterRadius={100}
           spiderfyOnMaxZoom={true}
           showCoverageOnHover={false}
         >
-          {filteredStations.map((station) => (
+          {visibleStations.map((station) => (
             <Marker
               key={station.idEstacion}
               position={[station.latitud, station.longitud]}
