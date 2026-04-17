@@ -42,17 +42,12 @@ export const Sidebar = () => {
   const handleSearch = async (overrideQuery?: string) => {
     const query = overrideQuery ?? searchQuery;
 
-    useAppStore.getState().setIsLoading(true)
-
-    let searchLat = currentLocation?.lat;
-    let searchLon = currentLocation?.lon;
-
     if (query.trim()) {
+      useAppStore.getState().setIsLoading(true)
       const coords = await geocodeAddress(query)
       if (coords) {
-        searchLat = coords.lat
-        searchLon = coords.lon
         setCurrentLocation(coords.lat, coords.lon)
+        if (query) addToHistory(query)
       } else {
         alert('No se ha podido encontrar la ubicación del municipio o CP especificado.')
         useAppStore.getState().setIsLoading(false)
@@ -60,61 +55,31 @@ export const Sidebar = () => {
       }
     }
 
-    if (!searchLat || !searchLon) {
+    if (!currentLocation && !query.trim()) {
       alert('Por favor, permite el acceso a tu ubicación, selecciona una en el mapa o escribe un municipio.')
-      useAppStore.getState().setIsLoading(false)
       return
     }
 
-    console.log('[Search Parameters]', {
-      lat: searchLat,
-      lon: searchLon,
-      radius,
-      fuelType: selectedFuelTypeId,
-    })
-
     try {
-      const [data, priceChanges] = await Promise.all([
-        fetchStationsByRadius(
-          searchLat,
-          searchLon,
-          radius,
-          selectedFuelTypeId
-        ),
-        fetchRecentPriceChanges(selectedFuelTypeId)
-      ])
-      
-      console.log('[Search Result] Success:', data)
-      useAppStore.getState().setPriceChanges(priceChanges)
-      setStations(data)
+      await useAppStore.getState().fetchStations()
       setSearchQuery('')
-      if (query) addToHistory(query)
       // Close sidebar on mobile after search
       if (window.innerWidth < 1024) {
         setIsSidebarOpen(false)
       }
     } catch (error) {
-      console.error('[Search Result] Error:', error)
       alert(`Error en la búsqueda: ${error instanceof Error ? error.message : 'Error desconocido'}`)
-    } finally {
-      useAppStore.getState().setIsLoading(false)
     }
   }
 
   const handleGeoLocation = () => {
-    console.log('[Geolocation Request] Requesting browser position...')
     useAppStore.getState().setIsLoading(true)
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        console.log('[Geolocation Result] Success:', {
-          lat: position.coords.latitude,
-          lon: position.coords.longitude,
-        })
         setCurrentLocation(position.coords.latitude, position.coords.longitude)
-        useAppStore.getState().setIsLoading(false)
+        useAppStore.getState().fetchStations()
       },
       (error) => {
-        console.error('[Geolocation Result] Error:', error)
         useAppStore.getState().setIsLoading(false)
         let message = 'No se pudo obtener tu ubicación.'
         if (error.code === error.PERMISSION_DENIED) message = 'Se denegó el acceso a la ubicación. Cambia los permisos de tu navegador.'
@@ -128,38 +93,14 @@ export const Sidebar = () => {
   const handleFuelChange = async (id: number) => {
     setSelectedFuelTypeId(id)
     if (stations.length > 0 && currentLocation) {
-      useAppStore.getState().setIsLoading(true)
-      try {
-        const [data, priceChanges] = await Promise.all([
-          fetchStationsByRadius(currentLocation.lat, currentLocation.lon, radius, id),
-          fetchRecentPriceChanges(id)
-        ])
-        useAppStore.getState().setPriceChanges(priceChanges)
-        setStations(data)
-      } catch (e) {
-        console.error('Error fetching data for new fuel type:', e)
-      } finally {
-        useAppStore.getState().setIsLoading(false)
-      }
+      useAppStore.getState().fetchStations()
     }
   }
 
   const handleRadiusChange = async (r: number) => {
     setRadius(r)
     if (stations.length > 0 && currentLocation) {
-      useAppStore.getState().setIsLoading(true)
-      try {
-        const [data, priceChanges] = await Promise.all([
-          fetchStationsByRadius(currentLocation.lat, currentLocation.lon, r, selectedFuelTypeId),
-          fetchRecentPriceChanges(selectedFuelTypeId)
-        ])
-        useAppStore.getState().setPriceChanges(priceChanges)
-        setStations(data)
-      } catch (e) {
-        console.error('Error fetching data for new radius:', e)
-      } finally {
-        useAppStore.getState().setIsLoading(false)
-      }
+      useAppStore.getState().fetchStations()
     }
   }
 

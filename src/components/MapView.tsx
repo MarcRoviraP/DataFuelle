@@ -43,15 +43,20 @@ const LocationIcon = L.divIcon({
 L.Marker.prototype.options.icon = DefaultIcon
 
 const MapEvents = () => {
+  const fetchStations = useAppStore(state => state.fetchStations)
+  const setCurrentLocation = useAppStore(state => state.setCurrentLocation)
+  const setSelectedStationId = useAppStore(state => state.setSelectedStationId)
+  const selectedStationId = useAppStore(state => state.selectedStationId)
+
   useMapEvents({
     click(e) {
-      const store = useAppStore.getState()
-      if (store.selectedStationId) {
+      if (selectedStationId) {
         // If a card/popup is open, clicking the map just closes it
-        store.setSelectedStationId(null)
+        setSelectedStationId(null)
       } else {
-        // Otherwise, move the search center
-        store.setCurrentLocation(e.latlng.lat, e.latlng.lng)
+        // Otherwise, move the search center AND fetch new data
+        setCurrentLocation(e.latlng.lat, e.latlng.lng)
+        fetchStations()
       }
     },
   })
@@ -262,11 +267,7 @@ export const MapView = () => {
 
         {currentLocation && (
           <Marker position={[currentLocation.lat, currentLocation.lon]} icon={LocationIcon}>
-            <Tooltip direction="top" offset={[0, -10]} opacity={1}>
-              <div style={{ fontWeight: 700, color: '#2563eb', fontSize: 13 }}>
-                📍 Tu ubicación actual
-              </div>
-            </Tooltip>
+            
           </Marker>
         )}
 
@@ -274,7 +275,7 @@ export const MapView = () => {
           chunkedLoading
           iconCreateFunction={createClusterCustomIcon}
           disableClusteringAtZoom={14}
-          maxClusterRadius={180}
+          maxClusterRadius={100}
           spiderfyOnMaxZoom={true}
           showCoverageOnHover={false}
         >

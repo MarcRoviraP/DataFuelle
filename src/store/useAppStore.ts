@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { Station, FuelType } from '../services/api'
+import { fetchStationsByRadius, fetchRecentPriceChanges } from '../services/api'
 import { calculateDistance } from '../utils/geo'
 
 interface AppState {
@@ -55,6 +56,7 @@ interface AppState {
   setViewMode: (mode: 'map' | 'list') => void
 
   // Actions
+  fetchStations: () => Promise<void>
   updateFilteredStations: () => void
 }
 
@@ -195,6 +197,32 @@ export const useAppStore = create<AppState>((set, get) => ({
   clearHistory: () => {
     localStorage.removeItem('searchHistory')
     set({ searchHistory: [] })
+  },
+
+  fetchStations: async () => {
+    const { currentLocation, radius, selectedFuelTypeId, setIsLoading, setStations, setPriceChanges } = get()
+    
+    if (!currentLocation) return
+
+    setIsLoading(true)
+    try {
+      const [data, priceChanges] = await Promise.all([
+        fetchStationsByRadius(
+          currentLocation.lat,
+          currentLocation.lon,
+          radius,
+          selectedFuelTypeId
+        ),
+        fetchRecentPriceChanges(selectedFuelTypeId)
+      ])
+      
+      setPriceChanges(priceChanges)
+      setStations(data)
+    } catch (error) {
+      console.error('[Store Fetch] Error:', error)
+    } finally {
+      setIsLoading(false)
+    }
   },
 
   updateFilteredStations: () => {
