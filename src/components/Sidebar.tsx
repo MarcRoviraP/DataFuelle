@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { useAppStore } from '../store/useAppStore'
 import { fetchSuggestions, geocodeAddress } from '../utils/geo'
-import { Search, MapPin, Fuel, Navigation, History, Filter, X, Clock, Tag } from 'lucide-react'
+import { Search, MapPin, Fuel, Navigation, History, Filter, X, Tag } from 'lucide-react'
 
 export const Sidebar = () => {
   const {
@@ -11,15 +11,12 @@ export const Sidebar = () => {
     setRadius,
     selectedFuelTypeId,
     setSelectedFuelTypeId,
-    fuelTypes,
     stations,
     searchHistory,
     addToHistory,
     isLoading,
     selectedBrands,
     setSelectedBrands,
-    sortBy,
-    setSortBy,
     showOnlyOpen,
     setShowOnlyOpen,
     showOnlyUpdatedToday,
@@ -31,6 +28,11 @@ export const Sidebar = () => {
   const [suggestions, setSuggestions] = useState<any[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const debounceRef = useRef<number | null>(null)
+
+  // Verified major brands with >= 100 stations in the global database (Updated from Real DB Stats)
+  const brandsToShow = useMemo(() => [
+    'REPSOL', 'GALP', 'CEPSA', 'MOEVE', 'BP', 'SHELL', 'BALLENOIL', 'PLENERGY', 'INTERMARCHÉ', 'PRIO', 'PETROPRIX', 'PETRONOR', 'ALVES BANDEIRA', 'CARREFOUR', 'AVIA'
+  ], [])
 
 
   // Handle autocomplete input changes
@@ -326,7 +328,7 @@ export const Sidebar = () => {
             <h2>Marcas Populares</h2>
           </div>
           <div className="flex flex-wrap gap-2">
-            {['REPSOL', 'CEPSA', 'BP', 'SHELL', 'PLENOIL', 'GALP'].map((brand) => (
+            {brandsToShow.map((brand) => (
               <button
                 key={brand}
                 onClick={() => {
