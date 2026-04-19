@@ -4,6 +4,8 @@ import { StationList } from './components/StationList'
 import { MapView } from './components/MapView'
 import { useAppStore } from './store/useAppStore'
 import { X, Map as MapIcon, List, Settings } from 'lucide-react'
+import { Menu } from 'lucide-react'
+import { AuthScreen } from './components/AuthScreen'
 
 function App() {
   const { 
@@ -13,7 +15,8 @@ function App() {
     selectedFuelTypeId, 
     fuelTypes,
     viewMode,
-    setViewMode
+    setViewMode,
+    isAuthScreenOpen
   } = useAppStore()
   const selectedFuelName = fuelTypes.find(f => f.idFuelType === selectedFuelTypeId)?.fuelTypeName || 'Combustible'
 
@@ -42,6 +45,16 @@ function App() {
 
   return (
     <div className="flex h-[100dvh] w-screen bg-slate-100 overflow-hidden font-sans text-slate-800 antialiased relative">
+      {!isAuthScreenOpen && (
+        <button 
+          onClick={() => setIsSidebarOpen(true)}
+          className="lg:hidden fixed top-6 left-4 z-[1000] p-3 bg-white/80 backdrop-blur-xl border border-white/40 rounded-2xl shadow-xl text-slate-600 hover:bg-white transition-all active:scale-95"
+        >
+          <Menu size={24} />
+        </button>
+      )}
+
+      {isAuthScreenOpen && <AuthScreen />}
       
       {/* Filters Drawer (Mobile) / Sidebar (Desktop) */}
       <div className={`fixed inset-0 z-[2000] lg:relative lg:z-10 transition-transform duration-300 transform ${
@@ -71,12 +84,12 @@ function App() {
         </section>
 
         {/* Map View - Full screen on mobile unless List is active, or persistent on XL */}
-        <section className={`flex-1 min-h-0 shadow-inner relative ${
+        <section className={`flex-1 min-h-0 shadow-inner relative pt-20 lg:pt-0 ${
           viewMode === 'map' ? 'flex' : 'hidden xl:flex'
         }`}>
           <MapView />
           
-          <div className="absolute top-4 left-4 md:top-6 md:left-6 z-[400] bg-white/80 backdrop-blur-md px-4 md:px-6 py-2 md:py-2.5 rounded-full shadow-2xl border border-white/50 pointer-events-none">
+          <div className="absolute top-6 left-4 md:top-8 md:left-1/2 md:-translate-x-1/2 lg:left-8 lg:translate-x-0 z-[400] bg-white/80 backdrop-blur-md px-4 md:px-6 py-2 md:py-2.5 rounded-full shadow-2xl border border-white/50 pointer-events-none">
             <p className="text-[10px] md:text-sm font-black text-slate-700 uppercase tracking-widest flex items-center gap-2 md:gap-3">
               <span className="w-1.5 h-1.5 md:w-2 md:h-2 bg-green-500 rounded-full animate-pulse ring-4 ring-green-100" />
               Precios de {selectedFuelName}

@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import type { Station, FuelType } from '../services/api'
 import { fetchStationsByRadius, fetchRecentPriceChanges } from '../services/api'
 import { calculateDistance } from '../utils/geo'
+import { supabase } from '../services/supabaseClient'
+import type { User } from '@supabase/supabase-js'
 
 interface AppState {
   // Location
@@ -55,9 +57,18 @@ interface AppState {
   viewMode: 'map' | 'list'
   setViewMode: (mode: 'map' | 'list') => void
 
+  // Auth & Profile
+  user: User | null
+  setUser: (user: User | null) => void
+  isLoadingAuth: boolean
+  isAuthScreenOpen: boolean
+  setIsAuthScreenOpen: (isOpen: boolean) => void
+  
   // Actions
   fetchStations: () => Promise<void>
   updateFilteredStations: () => void
+  syncProfile: () => Promise<void>
+  signOut: () => Promise<void>
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -323,6 +334,73 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     if (!isIdentical) {
       set({ filteredStations: filtered })
+      get().syncProfile()
+    }
+  },
+
+  // Auth implementation
+  user: null,
+  setUser: (user) => set({ user }),
+  isLoadingAuth: true,
+  isAuthScreenOpen: false,
+  setIsAuthScreenOpen: (isAuthScreenOpen) => set({ isAuthScreenOpen }),
+
+  signOut: async () => {
+    await supabase.auth.signOut()
+    set({ user: null, searchHistory: [] })
+    localStorage.removeItem('lastStations')
+  },
+
+  syncProfile: async () => {
+    const { user, selectedFuelTypeId, radius, showOnlyOpen, showOnlyUpdatedToday, selectedBrands, searchHistory } = get()
+    if (!user) return
+
+    try {
+      await supabase.from('profiles').upsert({
+        id: user.id,
+        fuel_type_id: selectedFuelTypeId,
+        search_radius: radius,
+        show_only_open: showOnlyOpen,
+        show_only_updated_today: showOnlyUpdatedToday,
+        selected_brands: selectedBrands,
+        search_history: searchHistory,
+        updated_at: new Date().toISOString()
+      })
+    } catch (error) {
+      console.error('[Store Sync] Error:', error)
     }
   },
 }))
+
+// Initialize Auth Listener
+supabase.auth.onAuthStateChange(async (_event, session) => {
+  const store = useAppStore.getState()
+  const user = session?.user || null
+  store.setUser(user)
+  
+  if (user) {
+    // Load profile from Supabase
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single()
+
+    if (profile) {
+      useAppStore.setState({
+        selectedFuelTypeId: profile.fuel_type_id,
+        radius: profile.search_radius,
+        showOnlyOpen: profile.show_only_open,
+        showOnlyUpdatedToday: profile.show_only_updated_today,
+        selectedBrands: profile.selected_brands || [],
+        searchHistory: profile.search_history || []
+      })
+      store.updateFilteredStations()
+    } else {
+      // First time user: save current local preferences as initial profile
+      store.syncProfile()
+    }
+  }
+  
+  useAppStore.setState({ isLoadingAuth: false })
+})

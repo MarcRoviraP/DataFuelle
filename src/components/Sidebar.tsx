@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo } from 'react'
 import { useAppStore } from '../store/useAppStore'
 import { fetchSuggestions, geocodeAddress } from '../utils/geo'
-import { Search, MapPin, Fuel, Navigation, History, Filter, X, Tag } from 'lucide-react'
+import { Search, MapPin, Fuel, Navigation, History, Filter, X, Tag, LogIn, LogOut } from 'lucide-react'
 
 export const Sidebar = () => {
   const {
@@ -22,6 +22,8 @@ export const Sidebar = () => {
     showOnlyUpdatedToday,
     setShowOnlyUpdatedToday,
     setIsSidebarOpen,
+    user,
+    signOut,
   } = useAppStore()
 
   const [searchQuery, setSearchQuery] = useState('')
@@ -136,12 +138,50 @@ export const Sidebar = () => {
 
   return (
     <aside className="w-[300px] md:w-[380px] max-w-[90vw] h-full bg-white flex flex-col shadow-2xl z-20 overflow-hidden custom-scrollbar">
-      <div className="p-6 bg-blue-600 text-white shrink-0">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Fuel size={28} className="text-blue-200" />
-          DataFuelle
-        </h1>
-        <p className="text-blue-100/70 text-sm mt-1">Busca el mejor precio cerca de ti</p>
+      {/* Integrated Header: Identity + Auth */}
+      <div className="p-6 pb-2 shrink-0 flex flex-col gap-4 animate-in fade-in duration-700">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 group cursor-pointer" onClick={() => window.location.reload()}>
+            <div className="bg-blue-600 p-1.5 rounded-xl shadow-lg shadow-blue-100">
+              <Fuel size={18} className="text-white" />
+            </div>
+            <span className="text-xl font-black text-slate-900 tracking-tighter">
+              Data<span className="text-blue-600">Fuelle</span>
+            </span>
+          </div>
+
+          <div className="flex items-center">
+            {!user ? (
+              <button
+                onClick={() => useAppStore.getState().setIsAuthScreenOpen(true)}
+                className="text-sm font-black text-slate-900 hover:text-blue-600 transition-colors flex items-center gap-1.5"
+              >
+                <LogIn size={16} />
+                <span>Entrar</span>
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 group">
+                <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-xs ring-2 ring-white shadow-md">
+                  {user.email?.[0].toUpperCase()}
+                </div>
+                <button
+                  onClick={() => signOut()}
+                  className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-500 transition-all scale-75 hover:scale-100"
+                  title="Cerrar sesión"
+                >
+                  <LogOut size={16} />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="text-center">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Busca el mejor precio cerca de ti</p>
+        </div>
+        
+        {/* Divider */}
+        <div className="h-[1px] w-full bg-slate-100" />
       </div>
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 space-y-8 scroll-smooth">
