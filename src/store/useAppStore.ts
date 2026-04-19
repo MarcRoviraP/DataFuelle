@@ -65,8 +65,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   setIsSidebarOpen: (isOpen) => set({ isSidebarOpen: isOpen }),
   viewMode: 'map',
   setViewMode: (mode) => set({ viewMode: mode }),
-  currentLocation: { lat: 39.4699, lon: -0.3763 }, // Default to Valencia to enable immediate fetch
-  setCurrentLocation: (lat, lon) => set({ currentLocation: { lat, lon } }),
+  currentLocation: JSON.parse(localStorage.getItem('lastLocation') || '{"lat": 39.4699, "lon": -0.3763}'),
+  setCurrentLocation: (lat, lon) => {
+    const location = { lat, lon }
+    localStorage.setItem('lastLocation', JSON.stringify(location))
+    set({ currentLocation: location })
+  },
   stationDiscounts: new Map(JSON.parse(localStorage.getItem('stationDiscounts') || '[]')),
   setStationDiscount: (stationId, discount) => {
     const discounts = new Map(get().stationDiscounts)
@@ -145,6 +149,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     })
 
     set({ stations: stationsWithChanges })
+    localStorage.setItem('lastStations', JSON.stringify(stationsWithChanges))
     get().updateFilteredStations()
   },
 
@@ -178,7 +183,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     get().updateFilteredStations()
   },
 
-  filteredStations: [],
+  filteredStations: JSON.parse(localStorage.getItem('lastStations') || '[]'),
   setFilteredStations: (stations) => set({ filteredStations: stations }),
 
   selectedStationId: null,
@@ -311,6 +316,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       })
     }
 
-    set({ filteredStations: filtered })
+    const currentFiltered = get().filteredStations
+    // Pure data comparison to avoid reference changes if content is identical
+    const isIdentical = filtered.length === currentFiltered.length && 
+      filtered.every((s, i) => s.idEstacion === currentFiltered[i].idEstacion && s.precioCombustible === currentFiltered[i].precioCombustible)
+
+    if (!isIdentical) {
+      set({ filteredStations: filtered })
+    }
   },
 }))

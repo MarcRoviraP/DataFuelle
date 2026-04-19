@@ -44,7 +44,7 @@ export const geocodeAddress = async (query: string): Promise<{ lat: number; lon:
   return null
 }
 
-export const fetchSuggestions = async (query: string): Promise<any[]> => {
+export const fetchSuggestions = async (query: string, lat?: number, lon?: number): Promise<any[]> => {
   if (!query || query.length < 3) return []
   
   try {
@@ -54,6 +54,12 @@ export const fetchSuggestions = async (query: string): Promise<any[]> => {
     url.searchParams.append('limit', '5')
     url.searchParams.append('addressdetails', '1')
     url.searchParams.append('countrycodes', 'es') // Limit to Spain
+    
+    if (lat && lon) {
+      // Proximity bias: focus on a 1 degree window around the location
+      const viewbox = `${lon - 0.5},${lat + 0.5},${lon + 0.5},${lat - 0.5}`
+      url.searchParams.append('viewbox', viewbox)
+    }
     
     const response = await fetch(url.toString(), {
       headers: { 'User-Agent': 'GasolinerasApp/1.0' }

@@ -22,7 +22,7 @@ export const StationList = () => {
     }
   }, [selectedStationId, filteredStations])
 
-  if (isLoading) {
+  if (isLoading && filteredStations.length === 0) {
     return <LoadingSkeleton />
   }
 

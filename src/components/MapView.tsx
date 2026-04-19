@@ -208,6 +208,9 @@ export const MapView = () => {
   const prices = useMemo(() => filteredStations.map(s => s.precioCombustible).filter(p => p > 0), [filteredStations])
   const averagePrice = useMemo(() => prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : 0, [prices])
 
+  // Icon Cache to prevent flickering
+  const iconCache = useRef<Map<string, L.DivIcon>>(new Map())
+
   const getPriceIcon = useCallback((price: number, isSelected: boolean) => {
     let color = '#64748b' // Default slate
     
@@ -217,7 +220,12 @@ export const MapView = () => {
       else color = '#d97706' // Orange (Average)
     }
 
-    return L.divIcon({
+    const cacheKey = `${price}-${isSelected}-${color}`
+    if (iconCache.current.has(cacheKey)) {
+      return iconCache.current.get(cacheKey)!
+    }
+
+    const icon = L.divIcon({
       className: '',
       html: `
         <div style="
@@ -233,6 +241,7 @@ export const MapView = () => {
           transition: all 0.2s;
           white-space: nowrap;
           pointer-events: none;
+          animation: marker-inner-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         ">
           ${price.toFixed(3)}€
         </div>
@@ -240,9 +249,16 @@ export const MapView = () => {
       iconSize: [60, 24],
       iconAnchor: [30, 12],
     })
+
+    iconCache.current.set(cacheKey, icon)
+    return icon
   }, [averagePrice])
 
-  const createClusterCustomIcon = (cluster: any) => {
+  // Cluster Icon Cache
+  const clusterIconCache = useRef<Map<string, L.DivIcon>>(new Map())
+
+  const createClusterCustomIcon = useCallback((cluster: any) => {
+    const count = cluster.getChildCount()
     const markers = cluster.getAllChildMarkers()
     let minPriceInCluster = Infinity
     
@@ -259,7 +275,12 @@ export const MapView = () => {
       else if (minPriceInCluster > averagePrice * 1.02) color = '#dc2626' // Red (Expensive)
     }
 
-    return L.divIcon({
+    const cacheKey = `${count}-${minPriceInCluster}-${color}`
+    if (clusterIconCache.current.has(cacheKey)) {
+      return clusterIconCache.current.get(cacheKey)!
+    }
+
+    const icon = L.divIcon({
       html: `
         <div style="
           background: ${color};
@@ -275,14 +296,18 @@ export const MapView = () => {
           box-shadow: 0 0 15px ${color}66, inset 0 0 10px rgba(0,0,0,0.2);
           border: 3px solid rgba(255,255,255,0.8);
           backdrop-filter: blur(4px);
+          animation: marker-inner-pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         ">
-          <span>${cluster.getChildCount()}</span>
+          <span>${count}</span>
         </div>
       `,
       className: 'custom-marker-cluster',
       iconSize: L.point(40, 40, true),
     })
-  }
+
+    clusterIconCache.current.set(cacheKey, icon)
+    return icon
+  }, [averagePrice])
 
   // Fuel badge config
   const fuels = [
@@ -366,7 +391,7 @@ export const MapView = () => {
           spiderfyOnMaxZoom={true}
           showCoverageOnHover={false}
         >
-          {filteredStations.map((station) => (
+          {useMemo(() => filteredStations.map((station) => (
             <Marker
               key={station.idEstacion}
               position={[station.latitud, station.longitud]}
@@ -382,6 +407,7 @@ export const MapView = () => {
               }}
             >
               <Popup minWidth={200}>
+                {/* ... existing popup content ... */}
                 <div style={{ padding: '4px 2px', minWidth: 200 }}>
                   <h4 style={{
                     fontWeight: 600, fontSize: 13, color: '#0f172a',
@@ -515,7 +541,7 @@ export const MapView = () => {
                 </div>
               </Popup>
             </Marker>
-          ))}
+          )), [filteredStations, selectedStationId, selectedFuelTypeId, stationDiscounts])}
         </MarkerClusterGroup>
       </MapContainer>
     </div>

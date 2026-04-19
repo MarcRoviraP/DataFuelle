@@ -48,10 +48,10 @@ export const Sidebar = () => {
     }
 
     debounceRef.current = window.setTimeout(async () => {
-      const results = await fetchSuggestions(val)
+      const results = await fetchSuggestions(val, currentLocation?.lat, currentLocation?.lon)
       setSuggestions(results)
       setShowSuggestions(results.length > 0)
-    }, 400)
+    }, 300)
   }
 
   const handleSelectSuggestion = (suggestion: any) => {
@@ -64,8 +64,8 @@ export const Sidebar = () => {
     setCurrentLocation(parseFloat(lat), parseFloat(lon))
     addToHistory(simpleName)
     
-    // Explicitly call fetchStations via store action
-    setTimeout(() => useAppStore.getState().fetchStations(), 100)
+    // Explicitly call fetchStations via store action - immediate update
+    useAppStore.getState().fetchStations()
   }
 
   const handleSearch = async (overrideQuery?: string) => {
