@@ -18,30 +18,26 @@ function App() {
   const selectedFuelName = fuelTypes.find(f => f.idFuelType === selectedFuelTypeId)?.fuelTypeName || 'Combustible'
 
   useEffect(() => {
-    const initApp = async () => {
-      const store = useAppStore.getState()
-      
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          async (position) => {
-            setCurrentLocation(position.coords.latitude, position.coords.longitude)
-            // Immediately fetch stations once location is set
-            await store.fetchStations()
-          },
-          async (error) => {
-            console.error('Error getting location:', error)
-            setCurrentLocation(39.4699, -0.3763)
-            await store.fetchStations()
-          },
-          { timeout: 10000 }
-        )
-      } else {
-        setCurrentLocation(39.4699, -0.3763)
-        await store.fetchStations()
-      }
-    }
+    const store = useAppStore.getState()
+    
+    // 1. Immediate fetch with initial/default location
+    store.fetchStations()
 
-    initApp()
+    // 2. Geolocation in background — non-blocking
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords
+          setCurrentLocation(latitude, longitude)
+          // Re-fetch only if user location is actually changed
+          store.fetchStations()
+        },
+        (error) => {
+          console.warn('Geolocation unavailable, using default center.', error)
+        },
+        { timeout: 5000 } // Reduced timeout for better responsiveness
+      )
+    }
   }, [setCurrentLocation])
 
   return (

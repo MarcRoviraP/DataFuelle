@@ -65,7 +65,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setIsSidebarOpen: (isOpen) => set({ isSidebarOpen: isOpen }),
   viewMode: 'map',
   setViewMode: (mode) => set({ viewMode: mode }),
-  currentLocation: null, // Default to null, will fetch user location on startup
+  currentLocation: { lat: 39.4699, lon: -0.3763 }, // Default to Valencia to enable immediate fetch
   setCurrentLocation: (lat, lon) => set({ currentLocation: { lat, lon } }),
   stationDiscounts: new Map(JSON.parse(localStorage.getItem('stationDiscounts') || '[]')),
   setStationDiscount: (stationId, discount) => {
