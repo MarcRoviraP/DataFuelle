@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo } from 'react'
 import { useAppStore } from '../store/useAppStore'
 import { fetchSuggestions, geocodeAddress } from '../utils/geo'
-import { Search, MapPin, Fuel, Navigation, History, Filter, X, Tag, LogIn, LogOut } from 'lucide-react'
+import { Search, MapPin, Fuel, Navigation, History, Filter, X, Tag, LogIn, LogOut, Zap, ArrowUpDown } from 'lucide-react'
 
 export const Sidebar = () => {
   const {
@@ -24,6 +24,8 @@ export const Sidebar = () => {
     setIsSidebarOpen,
     user,
     signOut,
+    sortBy,
+    setSortBy,
   } = useAppStore()
 
   const [searchQuery, setSearchQuery] = useState('')
@@ -299,6 +301,41 @@ export const Sidebar = () => {
                 {selectedFuelTypeId === type.id && <div className="w-1 h-1 bg-white rounded-full animate-pulse" />}
               </button>
             ))}
+          </div>
+        </section>
+
+        {/* Sorting Section */}
+        <section className="space-y-4 pt-2 border-t border-slate-100">
+          <div className="flex items-center gap-2 text-slate-800 font-bold px-1 border-l-4 border-blue-500">
+            <ArrowUpDown size={18} />
+            <h2>Ordenación</h2>
+          </div>
+          <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 mb-2">
+            <button
+              onClick={() => setSortBy('price')}
+              className={`flex-1 py-3 px-2 rounded-xl text-[10px] font-black uppercase tracking-tight transition-all text-center ${
+                sortBy === 'price' ? 'bg-white text-blue-600 shadow-md ring-1 ring-black/5' : 'text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              Precio
+            </button>
+            <button
+              onClick={() => setSortBy('distance')}
+              className={`flex-1 py-3 px-2 rounded-xl text-[10px] font-black uppercase tracking-tight transition-all text-center ${
+                sortBy === 'distance' ? 'bg-white text-blue-600 shadow-md ring-1 ring-black/5' : 'text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              Distancia
+            </button>
+            <button
+              onClick={() => setSortBy('smart')}
+              className={`flex-1 py-3 px-2 rounded-xl text-[10px] font-black uppercase tracking-tight transition-all flex items-center justify-center gap-1.5 ${
+                sortBy === 'smart' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              <Zap size={10} fill={sortBy === 'smart' ? "currentColor" : "none"} />
+              Smart
+            </button>
           </div>
         </section>
 
