@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { supabase } from '../services/supabaseClient'
 import { useAppStore } from '../store/useAppStore'
-import { X, Mail, Lock, Globe, Loader2, AlertCircle, Fuel, CheckCircle2 } from 'lucide-react'
+import { X, Mail, Lock, Globe, Loader2, AlertCircle, Fuel, CheckCircle2, Eye, EyeOff } from 'lucide-react'
 
 export const AuthScreen: React.FC = () => {
   const { isAuthScreenOpen, setIsAuthScreenOpen } = useAppStore()
@@ -10,6 +10,9 @@ export const AuthScreen: React.FC = () => {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const [showPassword, setShowPassword] = useState(false)
+  const [success, setSuccess] = useState(false)
 
   if (!isAuthScreenOpen) return null
 
@@ -22,12 +25,17 @@ export const AuthScreen: React.FC = () => {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
+        setIsAuthScreenOpen(false)
       } else {
         const { error } = await supabase.auth.signUp({ email, password })
         if (error) throw error
-        alert('¡Registro exitoso! Ya podés ver tus preferencias sincronizadas.')
+        setSuccess(true)
+        // Wait a bit to show the success message before closing or switching
+        setTimeout(() => {
+          setIsLogin(true)
+          setSuccess(false)
+        }, 3000)
       }
-      setIsAuthScreenOpen(false)
     } catch (err: any) {
       setError(err.message || 'Ocurrió un error inesperado')
     } finally {
@@ -143,6 +151,16 @@ export const AuthScreen: React.FC = () => {
               </div>
             )}
 
+            {success && (
+              <div className="p-4 bg-emerald-50 border-2 border-emerald-100 rounded-2xl flex items-start gap-3 animate-in slide-in-from-top-2 duration-500">
+                <CheckCircle2 className="text-emerald-500 shrink-0" size={20} />
+                <div>
+                  <p className="text-emerald-700 text-sm font-black">¡Registro completado!</p>
+                  <p className="text-emerald-600 text-xs font-bold">Por favor, revisá tu email para confirmar la cuenta.</p>
+                </div>
+              </div>
+            )}
+
             <form onSubmit={handleAuth} className="space-y-5">
               <div className="space-y-2">
                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Email</label>
@@ -165,13 +183,20 @@ export const AuthScreen: React.FC = () => {
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                   <input
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl transition-all outline-none font-bold text-slate-700 shadow-inner text-base"
+                    className="w-full pl-12 pr-12 py-4 bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl transition-all outline-none font-bold text-slate-700 shadow-inner text-base"
                     placeholder="••••••••"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
               </div>
 

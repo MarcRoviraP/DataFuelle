@@ -346,9 +346,29 @@ export const useAppStore = create<AppState>((set, get) => ({
   setIsAuthScreenOpen: (isAuthScreenOpen) => set({ isAuthScreenOpen }),
 
   signOut: async () => {
-    await supabase.auth.signOut()
-    set({ user: null, searchHistory: [] })
-    localStorage.removeItem('lastStations')
+    try {
+      console.log('[Auth] Signing out...')
+      const { error } = await supabase.auth.signOut()
+      if (error) throw error
+      
+      // Clear all relevant local storage to ensure a clean slate
+      localStorage.removeItem('lastStations')
+      localStorage.removeItem('searchHistory')
+      // Maintain lastLocation for better UX on return, but clear auth data
+      
+      set({ 
+        user: null, 
+        searchHistory: [], 
+        stations: [], 
+        filteredStations: [],
+        selectedStationId: null 
+      })
+      console.log('[Auth] Signed out successfully')
+    } catch (error) {
+      console.error('[Auth Error] Logout failed:', error)
+      // Force local sign out anyway if the API fails
+      set({ user: null })
+    }
   },
 
   syncProfile: async () => {

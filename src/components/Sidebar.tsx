@@ -150,7 +150,7 @@ export const Sidebar = () => {
             </span>
           </div>
 
-          <div className="flex items-center">
+          <div className="flex items-center gap-2">
             {!user ? (
               <button
                 onClick={() => useAppStore.getState().setIsAuthScreenOpen(true)}
@@ -166,13 +166,23 @@ export const Sidebar = () => {
                 </div>
                 <button
                   onClick={() => signOut()}
-                  className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-500 transition-all scale-75 hover:scale-100"
+                  className="flex items-center gap-2 px-3 py-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl border border-slate-100 hover:border-red-100 transition-all duration-200 cursor-pointer group"
                   title="Cerrar sesión"
                 >
-                  <LogOut size={16} />
+                  <LogOut size={16} className="group-hover:translate-x-0.5 transition-transform" />
+                  <span className="text-xs font-black uppercase tracking-tight">Salir</span>
                 </button>
               </div>
             )}
+
+            {/* Mobile Close Button */}
+            <button
+              onClick={() => setIsSidebarOpen(false)}
+              className="lg:hidden p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-all"
+              title="Cerrar panel"
+            >
+              <X size={20} />
+            </button>
           </div>
         </div>
 
