@@ -84,12 +84,12 @@ function App() {
         </section>
 
         {/* Map View - Full screen on mobile unless List is active, or persistent on XL */}
-        <section className={`flex-1 min-h-0 shadow-inner relative pt-20 lg:pt-0 ${
+        <section className={`flex-1 min-h-0 shadow-inner relative ${
           viewMode === 'map' ? 'flex' : 'hidden xl:flex'
         }`}>
           <MapView />
           
-          <div className="absolute top-6 left-4 md:top-8 md:left-1/2 md:-translate-x-1/2 lg:left-8 lg:translate-x-0 z-[400] bg-white/80 backdrop-blur-md px-4 md:px-6 py-2 md:py-2.5 rounded-full shadow-2xl border border-white/50 pointer-events-none">
+          <div className="absolute top-6 left-1/2 -translate-x-1/2 md:top-8 lg:left-8 lg:translate-x-0 z-[400] bg-white/80 backdrop-blur-md px-4 md:px-6 py-2 md:py-2.5 rounded-full shadow-2xl border border-white/50 pointer-events-none">
             <p className="text-[10px] md:text-sm font-black text-slate-700 uppercase tracking-widest flex items-center gap-2 md:gap-3">
               <span className="w-1.5 h-1.5 md:w-2 md:h-2 bg-green-500 rounded-full animate-pulse ring-4 ring-green-100" />
               Precios de {selectedFuelName}
