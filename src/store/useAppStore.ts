@@ -347,16 +347,24 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   signOut: async () => {
     try {
-      console.log('[Auth] Signing out...')
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
+      console.log('🔄 [Auth] Starting sign out process...')
       
-      // Clear all relevant local storage to ensure a clean slate
+      console.log('📡 [Auth] Calling supabase.auth.signOut()...')
+      const { error } = await supabase.auth.signOut()
+      if (error) {
+        console.error('❌ [Auth] Supabase error during sign out:', error)
+        throw error
+      }
+      console.log('✅ [Auth] Supabase sign out call successful')
+      
+      console.log('🧹 [Auth] Clearing local storage keys...')
       localStorage.removeItem('lastStations')
       localStorage.removeItem('searchHistory')
       localStorage.removeItem('lastLocation')
       localStorage.removeItem('stationDiscounts')
+      console.log('✅ [Auth] Local storage cleared')
       
+      console.log('💾 [Auth] Resetting store state...')
       set({ 
         user: null, 
         searchHistory: [], 
@@ -364,13 +372,15 @@ export const useAppStore = create<AppState>((set, get) => ({
         filteredStations: [],
         selectedStationId: null 
       })
-      console.log('[Auth] Signed out successfully')
+      console.log('✅ [Auth] Store state reset')
       
-      // Reload to reset all states to default
+      console.log('🚀 [Auth] Triggering page reload...')
       window.location.reload()
+      
     } catch (error) {
-      console.error('[Auth Error] Logout failed:', error)
+      console.error('💥 [Auth] Critical error during sign out:', error)
       // Force local sign out and reload anyway if the API fails
+      console.warn('⚠️ [Auth] Attempting forced local reset...')
       set({ user: null })
       window.location.reload()
     }
