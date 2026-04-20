@@ -354,7 +354,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       // Clear all relevant local storage to ensure a clean slate
       localStorage.removeItem('lastStations')
       localStorage.removeItem('searchHistory')
-      // Maintain lastLocation for better UX on return, but clear auth data
+      localStorage.removeItem('lastLocation')
+      localStorage.removeItem('stationDiscounts')
       
       set({ 
         user: null, 
@@ -364,10 +365,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         selectedStationId: null 
       })
       console.log('[Auth] Signed out successfully')
+      
+      // Reload to reset all states to default
+      window.location.reload()
     } catch (error) {
       console.error('[Auth Error] Logout failed:', error)
-      // Force local sign out anyway if the API fails
+      // Force local sign out and reload anyway if the API fails
       set({ user: null })
+      window.location.reload()
     }
   },
 
