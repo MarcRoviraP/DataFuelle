@@ -123,6 +123,7 @@ export const fetchRecentPriceChanges = async (
   return Array.isArray(data) ? data : []
 }
 export const fetchStationHistory = async (idEstacion: number, days: number | null = 30): Promise<any[]> => {
+  console.log('🚀 [API] fetchStationHistory LLAMADA para estación:', idEstacion, 'días:', days);
   // 1. Obtener datos "calientes" de la DB (últimos 7 días)
   let dbQuery = `price_history?station_id=eq.${idEstacion}&order=recorded_at.asc`
   const sevenDaysAgo = new Date()

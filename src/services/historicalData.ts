@@ -54,6 +54,15 @@ export const fetchHistoryFromParquet = async (idEstacion: number): Promise<any[]
 
     // 3. Registrar los archivos en DuckDB y consultar
     // Usamos read_parquet con la lista de URLs
+    console.log('[HistoricalData] Ejecutando query en DuckDB...');
+    
+    // Lista de URLs para la consulta
+    const urls = parquetFiles.map(url => `'${url}'`).join(',');
+
+    // Log para ver el total de filas en los parquets sin filtrar por estación
+    const countResult = await conn.query(`SELECT count(*) as total FROM read_parquet([${urls}])`);
+    console.log('[HistoricalData] Total de filas en Parquets (todos):', countResult.toArray()[0].toJSON().total);
+
     const query = `
       SELECT 
         station_id,
@@ -61,16 +70,26 @@ export const fetchHistoryFromParquet = async (idEstacion: number): Promise<any[]
         price_95,
         price_98,
         price_diesel
-      FROM read_parquet([${parquetFiles.map(url => `'${url}'`).join(',')}])
+      FROM read_parquet([${urls}])
       WHERE station_id = ${idEstacion}
       ORDER BY recorded_at ASC
     `;
 
-    console.log('[HistoricalData] Ejecutando query en DuckDB...');
     const result = await conn.query(query);
-    console.log('[HistoricalData] Query ejecutada. Procesando resultados...');
+    console.log('[HistoricalData] Query finalizada.');
 
-    const rows = result.toArray().map(row => {
+    const rawRows = result.toArray();
+    if (rawRows.length > 0) {
+      console.log('[HistoricalData] Muestra de la primera fila:', rawRows[0].toJSON());
+    } else {
+      console.warn('[HistoricalData] La query no devolvió nada para la estación:', idEstacion);
+      
+      // DIAGNÓSTICO: Ver qué IDs existen en el Parquet realmente
+      const diag = await conn.query(`SELECT DISTINCT station_id FROM read_parquet([${urls}]) LIMIT 10`);
+      console.log('[HistoricalData] IDs de estaciones disponibles en el Parquet (muestra):', diag.toArray().map(r => r.toJSON().station_id));
+    }
+
+    const rows = rawRows.map(row => {
         const obj = row.toJSON();
         return {
             station_id: obj.station_id,
