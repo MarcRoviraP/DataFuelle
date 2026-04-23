@@ -30,7 +30,7 @@ function LineChart({ data, fuelKey }: { data: any[]; fuelKey: string }) {
   const H = 80
   const PAD = { top: 8, right: 6, bottom: 20, left: 32 }
 
-  const prices = data.map(d => Number(d[fuelKey]) || 0).filter(p => p > 0)
+  const prices = data.map(d => Number(d[fuelKey]) || 0).filter(p => p >= 0.1)
   if (prices.length < 2) return (
     <div className="h-20 flex items-center justify-center text-[10px] text-slate-400">
       Insuficientes datos para graficar
@@ -58,9 +58,21 @@ function LineChart({ data, fuelKey }: { data: any[]; fuelKey: string }) {
   const yLabels = [minP, (minP + maxP) / 2, maxP]
 
   // X axis: show first, middle and last date
+  const firstDate = new Date(data[0].recorded_at)
+  const lastDate = new Date(data[data.length - 1].recorded_at)
+  const spansMultipleYears = firstDate.getFullYear() !== lastDate.getFullYear()
+
   const xDates = [0, Math.floor((data.length - 1) / 2), data.length - 1]
     .filter((i, pos, arr) => arr.indexOf(i) === pos)
-    .map(i => ({ x: xs[i], label: new Date(data[i].recorded_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) }))
+    .map(i => {
+      const d = new Date(data[i].recorded_at)
+      const options: Intl.DateTimeFormatOptions = { 
+        day: '2-digit', 
+        month: 'short',
+        ...(spansMultipleYears ? { year: '2-digit' } : {})
+      }
+      return { x: xs[i], label: d.toLocaleDateString('es-ES', options) }
+    })
 
   // Hover state
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)

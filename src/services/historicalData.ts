@@ -19,8 +19,14 @@ async function initDuckDB() {
   const logger = new duckdb.ConsoleLogger();
   db = new duckdb.AsyncDuckDB(logger, worker);
   await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+  
+  // Configurar multi-threading
+  await db.open({
+    maximumThreads: navigator.hardwareConcurrency || 4,
+  });
+
   URL.revokeObjectURL(worker_url);
-  console.log('[DuckDB] Instancia lista y operativa.');
+  console.log('[DuckDB] Instancia lista y operativa (Multi-threading habilitado).');
   return db;
 }
 
@@ -104,9 +110,9 @@ export const fetchHistoryFromParquet = async (idEstacion: number): Promise<any[]
         }
 
         // Limpieza: Si el precio es 0, lo ponemos como null para que la gráfica no pegue el bajón
-        const p95 = obj.price_95 > 0.1 ? obj.price_95 : null;
-        const p98 = obj.price_98 > 0.1 ? obj.price_98 : null;
-        const pdie = obj.price_diesel > 0.1 ? obj.price_diesel : null;
+        const p95 = obj.price_95 >= 0.1 ? obj.price_95 : null;
+        const p98 = obj.price_98 >= 0.1 ? obj.price_98 : null;
+        const pdie = obj.price_diesel >= 0.1 ? obj.price_diesel : null;
 
         return {
           station_id: Number(obj.station_id),
