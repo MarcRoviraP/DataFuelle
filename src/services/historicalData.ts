@@ -89,18 +89,36 @@ export const fetchHistoryFromParquet = async (idEstacion: number): Promise<any[]
       console.log('[HistoricalData] IDs de estaciones disponibles en el Parquet (muestra):', diag.toArray().map(r => r.toJSON().station_id));
     }
 
-    const rows = rawRows.map(row => {
+    const rows = rawRows
+      .map(row => {
         const obj = row.toJSON();
-        return {
-            station_id: obj.station_id,
-            recorded_at: obj.recorded_at instanceof Date ? obj.recorded_at.toISOString() : obj.recorded_at,
-            price_95: obj.price_95,
-            price_98: obj.price_98,
-            price_diesel: obj.price_diesel
-        };
-    });
+        
+        // Normalizar la fecha: DuckDB puede devolver número (ms), Date o String
+        let dateStr: string;
+        if (obj.recorded_at instanceof Date) {
+          dateStr = obj.recorded_at.toISOString();
+        } else if (typeof obj.recorded_at === 'number' || typeof obj.recorded_at === 'bigint') {
+          dateStr = new Date(Number(obj.recorded_at)).toISOString();
+        } else {
+          dateStr = String(obj.recorded_at);
+        }
 
-    console.log(`[HistoricalData] Proceso finalizado. ${rows.length} filas obtenidas.`);
+        // Limpieza: Si el precio es 0, lo ponemos como null para que la gráfica no pegue el bajón
+        const p95 = obj.price_95 > 0.1 ? obj.price_95 : null;
+        const p98 = obj.price_98 > 0.1 ? obj.price_98 : null;
+        const pdie = obj.price_diesel > 0.1 ? obj.price_diesel : null;
+
+        return {
+          station_id: Number(obj.station_id),
+          recorded_at: dateStr,
+          price_95: p95,
+          price_98: p98,
+          price_diesel: pdie
+        };
+      })
+      .filter(row => row.price_95 !== null || row.price_98 !== null || row.price_diesel !== null);
+
+    console.log(`[HistoricalData] Proceso finalizado. ${rows.length} filas obtenidas (limpias).`);
     await conn.close();
     return rows;
   } catch (err) {

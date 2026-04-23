@@ -132,8 +132,16 @@ export const fetchStationHistory = async (idEstacion: number, days: number | nul
 
   let dbData: any[] = []
   try {
-    dbData = await supabaseFetch(dbQuery)
-    console.log(`[API] Se obtuvieron ${dbData.length} registros de la DB (últimos 7 días)`)
+    const rawDbData = await supabaseFetch(dbQuery)
+    console.log(`[API] Se obtuvieron ${rawDbData.length} registros de la DB (últimos 7 días)`)
+    
+    // Limpieza de datos de la DB: 0 a null y filtrar sospechosos
+    dbData = rawDbData.map((d: any) => ({
+      ...d,
+      price_95: d.price_95 > 0.5 ? d.price_95 : null,
+      price_98: d.price_98 > 0.5 ? d.price_98 : null,
+      price_diesel: d.price_diesel > 0.5 ? d.price_diesel : null
+    }))
   } catch (error) {
     console.error('[DB History Error]', error)
   }
