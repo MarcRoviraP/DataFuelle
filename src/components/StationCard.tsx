@@ -25,15 +25,18 @@ const PERIOD_TABS: { label: string; days: number | null }[] = [
 ]
 
 // SVG line chart — pure, no deps
-function LineChart({ data, fuelKey }: { data: any[]; fuelKey: string }) {
+function LineChart({ data: rawData, fuelKey }: { data: any[]; fuelKey: string }) {
   const W = 260
   const H = 80
   const PAD = { top: 8, right: 6, bottom: 20, left: 32 }
 
-  const prices = data.map(d => Number(d[fuelKey]) || 0).filter(p => p >= 0.1)
+  // Filter data to only include valid prices for THIS fuel type
+  const data = rawData.filter(d => d[fuelKey] !== null && d[fuelKey] !== undefined && Number(d[fuelKey]) >= 0.1)
+  const prices = data.map(d => Number(d[fuelKey]))
+
   if (prices.length < 2) return (
     <div className="h-20 flex items-center justify-center text-[10px] text-slate-400">
-      Insuficientes datos para graficar
+      Insuficientes datos para graficar {fuelKey.replace('price_', '').toUpperCase()}
     </div>
   )
 
@@ -45,7 +48,7 @@ function LineChart({ data, fuelKey }: { data: any[]; fuelKey: string }) {
   const innerH = H - PAD.top - PAD.bottom
 
   const xs = data.map((_, i) => PAD.left + (i / (data.length - 1)) * innerW)
-  const ys = data.map(d => PAD.top + innerH - ((Number(d[fuelKey]) || 0) - minP) / rangeP * innerH)
+  const ys = data.map(d => PAD.top + innerH - (Number(d[fuelKey]) - minP) / rangeP * innerH)
 
   const polyline = xs.map((x, i) => `${x},${ys[i]}`).join(' ')
 
@@ -140,19 +143,36 @@ function LineChart({ data, fuelKey }: { data: any[]; fuelKey: string }) {
             <circle cx={xs[hoveredIdx]} cy={ys[hoveredIdx]} r={3} fill="#3b82f6" stroke="white" strokeWidth="1.5" />
             <g>
               <rect
-                x={Math.min(xs[hoveredIdx] - 22, W - 58)}
-                y={ys[hoveredIdx] - 22}
-                width={52}
-                height={14}
+                x={Math.min(xs[hoveredIdx] - 25, W - 58)}
+                y={ys[hoveredIdx] - 32}
+                width={56}
+                height={24}
                 rx={3}
                 fill="#1e293b"
                 opacity={0.92}
               />
+              {/* Date */}
               <text
-                x={Math.min(xs[hoveredIdx] - 22, W - 58) + 26}
+                x={Math.min(xs[hoveredIdx] - 25, W - 58) + 28}
+                y={ys[hoveredIdx] - 22}
+                textAnchor="middle"
+                fontSize="6.5"
+                fill="#94a3b8"
+                fontFamily="sans-serif"
+                fontWeight="medium"
+              >
+                {new Date(data[hoveredIdx].recorded_at).toLocaleDateString('es-ES', { 
+                  day: '2-digit', 
+                  month: 'short',
+                  ...(spansMultipleYears ? { year: '2-digit' } : {})
+                })}
+              </text>
+              {/* Price */}
+              <text
+                x={Math.min(xs[hoveredIdx] - 25, W - 58) + 28}
                 y={ys[hoveredIdx] - 12}
                 textAnchor="middle"
-                fontSize="7.5"
+                fontSize="8"
                 fill="white"
                 fontFamily="sans-serif"
                 fontWeight="bold"

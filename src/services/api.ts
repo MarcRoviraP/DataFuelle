@@ -135,13 +135,24 @@ export const fetchStationHistory = async (idEstacion: number, days: number | nul
     const rawDbData = await supabaseFetch(dbQuery)
     console.log(`[API] Se obtuvieron ${rawDbData.length} registros de la DB (últimos 7 días)`)
     
-    // Limpieza de datos de la DB: 0 a null y filtrar sospechosos
-    dbData = rawDbData.map((d: any) => ({
-      ...d,
-      price_95: d.price_95 >= 0.1 ? d.price_95 : null,
-      price_98: d.price_98 >= 0.1 ? d.price_98 : null,
-      price_diesel: d.price_diesel >= 0.1 ? d.price_diesel : null
-    }))
+    // Limpieza de datos de la DB: NaN, null o < 0.1 a null
+    const cleanPrice = (val: any) => {
+      if (val === null || val === undefined) return null;
+      const n = Number(val);
+      return (!isNaN(n) && n >= 0.1) ? n : null;
+    };
+
+    dbData = rawDbData
+      .map((d: any) => ({
+        ...d,
+        price_95: cleanPrice(d.price_95),
+        price_98: cleanPrice(d.price_98),
+        price_diesel: cleanPrice(d.price_diesel)
+      }))
+      .filter((d: any) => {
+        if (isNaN(new Date(d.recorded_at).getTime())) return false;
+        return d.price_95 !== null || d.price_98 !== null || d.price_diesel !== null;
+      })
   } catch (error) {
     console.error('[DB History Error]', error)
   }
