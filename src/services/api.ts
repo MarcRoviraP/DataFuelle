@@ -1,4 +1,5 @@
 import { supabaseFetch } from './supabaseClient'
+import { fetchHistoryFromParquet } from './historicalData'
 
 export interface FuelType {
   idFuelType: number
@@ -122,16 +123,36 @@ export const fetchRecentPriceChanges = async (
   return Array.isArray(data) ? data : []
 }
 export const fetchStationHistory = async (idEstacion: number, days: number | null = 30): Promise<any[]> => {
-  let query = `price_history?station_id=eq.${idEstacion}&order=recorded_at.asc`
-  if (days !== null) {
-    const since = new Date()
-    since.setDate(since.getDate() - days)
-    query += `&recorded_at=gte.${since.toISOString()}`
-  }
+  // 1. Obtener datos "calientes" de la DB (últimos 7 días)
+  let dbQuery = `price_history?station_id=eq.${idEstacion}&order=recorded_at.asc`
+  const sevenDaysAgo = new Date()
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+  dbQuery += `&recorded_at=gte.${sevenDaysAgo.toISOString()}`
+
+  let dbData: any[] = []
   try {
-    return await supabaseFetch(query)
+    dbData = await supabaseFetch(dbQuery)
   } catch (error) {
-    console.error('[History API Error]', error)
-    return []
+    console.error('[DB History Error]', error)
   }
+
+  // 2. Si necesitamos más de 7 días, buscamos en el histórico (Parquet)
+  let historicalData: any[] = []
+  if (days === null || days > 7) {
+    console.log('[API] Buscando histórico en Parquet vía DuckDB...')
+    historicalData = await fetchHistoryFromParquet(idEstacion)
+    
+    // Si hay un límite de días, filtramos el histórico
+    if (days !== null) {
+      const since = new Date()
+      since.setDate(since.getDate() - days)
+      historicalData = historicalData.filter(d => new Date(d.recorded_at) >= since)
+    }
+  }
+
+  // 3. Combinar y de-duplicar (por si hay solapamiento)
+  const combined = [...historicalData, ...dbData]
+  const unique = Array.from(new Map(combined.map(item => [item.recorded_at, item])).values())
+  
+  return unique.sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime())
 }

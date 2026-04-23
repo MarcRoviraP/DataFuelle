@@ -44,3 +44,7 @@ backfill.log
 # Supabase local env
 supabase/.env
 supabase/config.toml
+
+.env*
+.venv
+*.parquet
