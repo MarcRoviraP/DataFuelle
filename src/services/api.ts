@@ -132,6 +132,7 @@ export const fetchStationHistory = async (idEstacion: number, days: number | nul
   let dbData: any[] = []
   try {
     dbData = await supabaseFetch(dbQuery)
+    console.log(`[API] Se obtuvieron ${dbData.length} registros de la DB (últimos 7 días)`)
   } catch (error) {
     console.error('[DB History Error]', error)
   }
@@ -139,8 +140,9 @@ export const fetchStationHistory = async (idEstacion: number, days: number | nul
   // 2. Si necesitamos más de 7 días, buscamos en el histórico (Parquet)
   let historicalData: any[] = []
   if (days === null || days > 7) {
-    console.log('[API] Buscando histórico en Parquet vía DuckDB...')
+    console.log('[API] Buscando histórico en Parquet vía DuckDB para estación:', idEstacion)
     historicalData = await fetchHistoryFromParquet(idEstacion)
+    console.log(`[API] Se obtuvieron ${historicalData.length} registros del historial Parquet`)
     
     // Si hay un límite de días, filtramos el histórico
     if (days !== null) {
