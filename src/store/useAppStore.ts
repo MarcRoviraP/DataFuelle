@@ -416,22 +416,24 @@ export const useAppStore = create<AppState>((set, get) => ({
       const selectedCar = userCars.find(c => c.id === selectedCarId)
       
       if (selectedCar && selectedCar.consumo_l_100km > 0) {
-        // Advanced Smart Filter: Based on REAL COST
+        // Advanced Smart Filter: Based on REAL COST (Fuel + Time)
         const consumo_km = selectedCar.consumo_l_100km / 100
-        const LITROS_REPOSTAJE_ESTIMADO = 45 // Valor promedio para el cálculo de ahorro
+        const LITROS_REPOSTAJE_ESTIMADO = 35 // Un tanque parcial más realista
+        const VALOR_TIEMPO_HORA = 12 // €/hora (costo de oportunidad)
+        const VELOCIDAD_MEDIA_KMH = 35 // km/h (estimación urbana/mixta)
 
         const scoredStations = filtered.map(s => {
           const dist = s.distancia || 0
           const precio = s.precioCombustible || 9.99
           
-          // Coste de ir y volver
-          const costeDesplazamiento = dist * 2 * precio * consumo_km
-          // Ahorro potencial respecto a la gasolinera más cara del set (como referencia local)
-          // O simplemente usar el precio como factor de peso negativo
+          // Coste de combustible (ir y volver)
+          const costeCombustibleViaje = dist * 2 * precio * consumo_km
+          // Coste de tiempo (estimado)
+          const tiempoViajeHoras = (dist * 2) / VELOCIDAD_MEDIA_KMH
+          const costeTiempo = tiempoViajeHoras * VALOR_TIEMPO_HORA
           
-          // El score aquí representa el "gasto extra + precio"
-          // Queremos minimizar (precio * litros + costeDesplazamiento)
-          const gastoTotal = (precio * LITROS_REPOSTAJE_ESTIMADO) + costeDesplazamiento
+          // Gasto Total = Precio del combustible + Gasto de viaje + Coste de tiempo
+          const gastoTotal = (precio * LITROS_REPOSTAJE_ESTIMADO) + costeCombustibleViaje + costeTiempo
           
           return { station: s, score: gastoTotal }
         })
@@ -439,7 +441,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         scoredStations.sort((a, b) => a.score - b.score)
         filtered = scoredStations.map(item => item.station)
       } else {
-        // Fallback to basic smart normalization
+        // Fallback to basic smart normalization with HEAVY distance weight
         const distances = filtered.map(s => s.distancia || 0)
         const prices = filtered.map(s => s.precioCombustible || 9.99)
 
@@ -448,13 +450,20 @@ export const useAppStore = create<AppState>((set, get) => ({
         const minPrice = Math.min(...prices)
         const maxPrice = Math.max(...prices)
 
-        const norm = (val: number, min: number, max: number) => 
-          max === min ? 0 : (val - min) / (max - min)
+        // Normalización con "colchón" para que diferencias de 1-2 céntimos no pesen tanto
+        const norm = (val: number, min: number, max: number, margin = 0) => {
+          const range = max - min
+          if (range <= margin) return 0
+          return (val - min) / range
+        }
 
         const scoredStations = filtered.map(s => {
+          // Le damos 70% de peso a la distancia y 30% al precio
           const dScore = norm(s.distancia || 0, minDist, maxDist)
-          const pScore = norm(s.precioCombustible || 9.99, minPrice, maxPrice)
-          return { station: s, score: dScore * 0.5 + pScore * 0.5 }
+          // Usamos un margen de 0.03€ para que variaciones pequeñas no disparen el score
+          const pScore = norm(s.precioCombustible || 9.99, minPrice, maxPrice, 0.03)
+          
+          return { station: s, score: dScore * 0.7 + pScore * 0.3 }
         })
 
         scoredStations.sort((a, b) => a.score - b.score)
