@@ -124,53 +124,66 @@ export const fetchRecentPriceChanges = async (
 }
 export const fetchStationHistory = async (idEstacion: number, days: number | null = 30): Promise<any[]> => {
   console.log('🚀 [API] fetchStationHistory LLAMADA para estación:', idEstacion, 'días:', days);
-  // 1. Obtener datos "calientes" de la DB (últimos 7 días)
-  let dbQuery = `price_history?station_id=eq.${idEstacion}&order=recorded_at.asc`
-  const sevenDaysAgo = new Date()
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-  dbQuery += `&recorded_at=gte.${sevenDaysAgo.toISOString()}`
 
-  let dbData: any[] = []
-  try {
-    const rawDbData = await supabaseFetch(dbQuery)
-    console.log(`[API] Se obtuvieron ${rawDbData.length} registros de la DB (últimos 7 días)`)
-    
-    // Limpieza de datos de la DB: NaN, null o < 0.1 a null
-    const cleanPrice = (val: any) => {
-      if (val === null || val === undefined) return null;
-      const n = Number(val);
-      return (!isNaN(n) && n >= 0.1) ? n : null;
-    };
-
-    dbData = rawDbData
-      .map((d: any) => ({
-        ...d,
-        price_95: cleanPrice(d.price_95),
-        price_98: cleanPrice(d.price_98),
-        price_diesel: cleanPrice(d.price_diesel)
-      }))
-      .filter((d: any) => {
-        if (isNaN(new Date(d.recorded_at).getTime())) return false;
-        return d.price_95 !== null || d.price_98 !== null || d.price_diesel !== null;
-      })
-  } catch (error) {
-    console.error('[DB History Error]', error)
-  }
-
-  // 2. Si necesitamos más de 7 días, buscamos en el histórico (Parquet)
-  let historicalData: any[] = []
-  if (days === null || days > 7) {
-    console.log('[API] Buscando histórico en Parquet vía DuckDB para estación:', idEstacion)
-    historicalData = await fetchHistoryFromParquet(idEstacion)
-    console.log(`[API] Se obtuvieron ${historicalData.length} registros del historial Parquet`)
-    
-    // Si hay un límite de días, filtramos el histórico
+  // 1. Preparar queries en paralelo
+  const fetchDbData = async () => {
+    let dbQuery = `price_history?station_id=eq.${idEstacion}&order=recorded_at.asc`
     if (days !== null) {
       const since = new Date()
       since.setDate(since.getDate() - days)
-      historicalData = historicalData.filter(d => new Date(d.recorded_at) >= since)
+      dbQuery += `&recorded_at=gte.${since.toISOString()}`
+    }
+
+    try {
+      const rawDbData = await supabaseFetch(dbQuery)
+      console.log(`[API] Se obtuvieron ${rawDbData.length} registros de la DB`)
+      
+      const cleanPrice = (val: any) => {
+        if (val === null || val === undefined) return null;
+        const n = Number(val);
+        return (!isNaN(n) && n >= 0.1) ? n : null;
+      };
+
+      return rawDbData
+        .map((d: any) => ({
+          ...d,
+          price_95: cleanPrice(d.price_95),
+          price_98: cleanPrice(d.price_98),
+          price_diesel: cleanPrice(d.price_diesel)
+        }))
+        .filter((d: any) => {
+          if (isNaN(new Date(d.recorded_at).getTime())) return false;
+          return d.price_95 !== null || d.price_98 !== null || d.price_diesel !== null;
+        })
+    } catch (error) {
+      console.error('[DB History Error]', error)
+      return []
     }
   }
+
+  const fetchParquetData = async () => {
+    try {
+      if (days === null || days > 7) {
+        console.log('[API] Buscando histórico en Parquet vía DuckDB para estación:', idEstacion)
+        let historicalData = await fetchHistoryFromParquet(idEstacion)
+        console.log(`[API] Se obtuvieron ${historicalData.length} registros del historial Parquet`)
+        
+        if (days !== null) {
+          const since = new Date()
+          since.setDate(since.getDate() - days)
+          historicalData = historicalData.filter(d => new Date(d.recorded_at) >= since)
+        }
+        return historicalData
+      }
+    } catch (error) {
+      console.error('[API] Error al obtener datos de Parquet:', error)
+      return []
+    }
+    return []
+  }
+
+  // 2. Ejecutar en paralelo
+  const [dbData, historicalData] = await Promise.all([fetchDbData(), fetchParquetData()])
 
   // 3. Combinar y de-duplicar (por si hay solapamiento)
   const combined = [...historicalData, ...dbData]

@@ -17,17 +17,34 @@ async function initDuckDB() {
 
   const worker = new Worker(worker_url);
   const logger = new duckdb.ConsoleLogger();
-  db = new duckdb.AsyncDuckDB(logger, worker);
-  await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+  const _db = new duckdb.AsyncDuckDB(logger, worker);
   
-  // Configurar multi-threading
-  await db.open({
-    maximumThreads: navigator.hardwareConcurrency || 4,
-  });
+  try {
+    await _db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+    
+    // Intentar abrir con multi-threading si el bundle lo soporta
+    try {
+      await _db.open({
+        query: { castBigIntToDouble: true },
+        maximumThreads: bundle.pthreadWorker ? (navigator.hardwareConcurrency || 4) : 1,
+      });
+    } catch (openErr: any) {
+      console.warn('[DuckDB] Error en open (posible hilo), reintentando modo simple...', openErr.message);
+      await _db.open({
+        query: { castBigIntToDouble: true },
+        maximumThreads: 1
+      });
+    }
 
-  URL.revokeObjectURL(worker_url);
-  console.log('[DuckDB] Instancia lista y operativa (Multi-threading habilitado).');
-  return db;
+    db = _db;
+    URL.revokeObjectURL(worker_url);
+    console.log('[DuckDB] Instancia lista y operativa.');
+    return db;
+  } catch (err) {
+    console.error('[DuckDB] Error fatal en instanciación:', err);
+    URL.revokeObjectURL(worker_url);
+    throw err;
+  }
 }
 
 export const fetchHistoryFromParquet = async (idEstacion: number): Promise<any[]> => {
@@ -38,7 +55,9 @@ export const fetchHistoryFromParquet = async (idEstacion: number): Promise<any[]
     const conn = await instance.connect();
 
     // 1. Listar archivos en el bucket
+    console.time('[HistoricalData] Storage List');
     const { data: files, error } = await supabase.storage.from('historical-data').list();
+    console.timeEnd('[HistoricalData] Storage List');
     console.log('[HistoricalData] Archivos en bucket:', files);
     
     if (error || !files || files.length === 0) {

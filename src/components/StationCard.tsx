@@ -1,4 +1,4 @@
-import { useState, memo } from 'react'
+import { useState, memo, useRef } from 'react'
 import { fetchStationHistory, type Station } from '../services/api'
 import { MapPin, Clock, Navigation, Tag, Calendar, TrendingUp, ChevronDown, ChevronUp } from 'lucide-react'
 import { shouldShowLastUpdate, formatLastUpdate } from '../utils/date'
@@ -196,15 +196,28 @@ export const StationCard = memo(({ station, isSelected, onClick }: StationCardPr
   const [activeDays, setActiveDays] = useState<number | null>(7)
   const [historyData, setHistoryData] = useState<any[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
+  const fetchRequestId = useRef(0)
   
   const fuelKey = selectedFuelTypeId === 9 ? 'price_95' : selectedFuelTypeId === 12 ? 'price_98' : 'price_diesel'
   const fuelLabel = fuelKey === 'price_95' ? 'G95' : fuelKey === 'price_98' ? 'G98' : 'DSL'
 
   const loadHistory = async (days: number | null) => {
+    const rid = ++fetchRequestId.current
     setLoadingHistory(true)
-    const data = await fetchStationHistory(station.idEstacion, days)
-    setHistoryData(data)
-    setLoadingHistory(false)
+    
+    try {
+      const data = await fetchStationHistory(station.idEstacion, days)
+      // Only update if this is still the latest request
+      if (rid === fetchRequestId.current) {
+        setHistoryData(data)
+        setLoadingHistory(false)
+      }
+    } catch (error) {
+      console.error('[StationCard] Error loading history:', error)
+      if (rid === fetchRequestId.current) {
+        setLoadingHistory(false)
+      }
+    }
   }
 
   const handleTab = async (days: number | null) => {
