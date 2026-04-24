@@ -19,8 +19,14 @@ async function initDuckDB() {
   const logger = new duckdb.ConsoleLogger();
   db = new duckdb.AsyncDuckDB(logger, worker);
   await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+  
+  // Configurar multi-threading
+  await db.open({
+    maximumThreads: navigator.hardwareConcurrency || 4,
+  });
+
   URL.revokeObjectURL(worker_url);
-  console.log('[DuckDB] Instancia lista y operativa.');
+  console.log('[DuckDB] Instancia lista y operativa (Multi-threading habilitado).');
   return db;
 }
 
@@ -103,10 +109,16 @@ export const fetchHistoryFromParquet = async (idEstacion: number): Promise<any[]
           dateStr = String(obj.recorded_at);
         }
 
-        // Limpieza: Si el precio es 0, lo ponemos como null para que la gráfica no pegue el bajón
-        const p95 = obj.price_95 > 0.1 ? obj.price_95 : null;
-        const p98 = obj.price_98 > 0.1 ? obj.price_98 : null;
-        const pdie = obj.price_diesel > 0.1 ? obj.price_diesel : null;
+        // Limpieza: Si el precio es 0, NaN o null, lo ponemos como null para que la gráfica no pegue el bajón
+        const cleanPrice = (val: any) => {
+          if (val === null || val === undefined) return null;
+          const n = Number(val);
+          return (!isNaN(n) && n >= 0.1) ? n : null;
+        };
+
+        const p95 = cleanPrice(obj.price_95);
+        const p98 = cleanPrice(obj.price_98);
+        const pdie = cleanPrice(obj.price_diesel);
 
         return {
           station_id: Number(obj.station_id),
@@ -116,7 +128,12 @@ export const fetchHistoryFromParquet = async (idEstacion: number): Promise<any[]
           price_diesel: pdie
         };
       })
-      .filter(row => row.price_95 !== null || row.price_98 !== null || row.price_diesel !== null);
+      .filter(row => {
+        // Purga de registros con fecha inválida (NaN en el timestamp)
+        if (isNaN(new Date(row.recorded_at).getTime())) return false;
+        // Y que al menos tenga un precio válido
+        return row.price_95 !== null || row.price_98 !== null || row.price_diesel !== null;
+      });
 
     console.log(`[HistoricalData] Proceso finalizado. ${rows.length} filas obtenidas (limpias).`);
     await conn.close();
