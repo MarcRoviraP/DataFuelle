@@ -26,26 +26,32 @@ export const CarSelector = ({ onClose }: CarSelectorProps) => {
 
   const fetchMakes = async () => {
     setLoading(true)
+    console.log('📡 [CarSelector] Fetching makes...')
     try {
       if (makesCache.length > 0) {
+        console.log('📦 [CarSelector] Using makes from cache')
         setMakes(makesCache)
       } else {
         const { data, error } = await supabase
-          .from('cars')
+          .from('car_makes')
           .select('make')
-          .not('make', 'is', null)
         
-        if (error) throw error
+        if (error) {
+          console.error('❌ [CarSelector] Error fetching makes from view:', error)
+          throw error
+        }
         
-        const uniqueMakes = Array.from(new Set(data.map(d => d.make)))
+        console.log(`✅ [CarSelector] Received ${data?.length} unique makes from view`)
+        
+        const uniqueMakes = data.map(d => d.make)
           .filter(m => isNaN(Number(m))) // Filter out numeric artifacts
-          .sort()
         
+        console.log(`✨ [CarSelector] Final processed makes: ${uniqueMakes.length}`)
         setMakes(uniqueMakes)
         setMakesCache(uniqueMakes)
       }
     } catch (err) {
-      console.error('Error fetching makes:', err)
+      console.error('💥 [CarSelector] Critical error in fetchMakes:', err)
     } finally {
       setLoading(false)
     }
@@ -54,6 +60,7 @@ export const CarSelector = ({ onClose }: CarSelectorProps) => {
   const fetchModels = async (make: string) => {
     setLoading(true)
     setSelectedMake(make)
+    console.log(`📡 [CarSelector] Fetching models for make: ${make}...`)
     try {
       const { data, error } = await supabase
         .from('cars')
@@ -61,12 +68,17 @@ export const CarSelector = ({ onClose }: CarSelectorProps) => {
         .eq('make', make)
         .order('model', { ascending: true })
       
-      if (error) throw error
+      if (error) {
+        console.error(`❌ [CarSelector] Error fetching models for ${make}:`, error)
+        throw error
+      }
+      
+      console.log(`✅ [CarSelector] Received ${data?.length} models for ${make}`)
       setModels(data as Car[])
       setStep('model')
       setSearch('')
     } catch (err) {
-      console.error('Error fetching models:', err)
+      console.error('💥 [CarSelector] Critical error in fetchModels:', err)
     } finally {
       setLoading(false)
     }
