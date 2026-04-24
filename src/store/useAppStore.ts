@@ -5,6 +5,15 @@ import { calculateDistance } from '../utils/geo'
 import { supabase } from '../services/supabaseClient'
 import type { User } from '@supabase/supabase-js'
 
+export interface Car {
+  id: number
+  make: string
+  model: string
+  year: number
+  combustible: string
+  consumo_l_100km: number
+}
+
 interface AppState {
   // Location
   currentLocation: { lat: number; lon: number } | null
@@ -64,6 +73,14 @@ interface AppState {
   isAuthScreenOpen: boolean
   setIsAuthScreenOpen: (isOpen: boolean) => void
   
+  // Cars (Garage)
+  userCars: Car[]
+  selectedCarId: number | null
+  fetchUserCars: () => Promise<void>
+  addUserCar: (car: Car) => Promise<void>
+  removeUserCar: (carId: number) => Promise<void>
+  setSelectedCarId: (id: number | null) => Promise<void>
+
   // Actions
   fetchStations: () => Promise<void>
   updateFilteredStations: () => void
@@ -241,8 +258,110 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  userCars: [],
+  selectedCarId: null,
+
+  fetchUserCars: async () => {
+    const { user } = get()
+    if (!user) return
+
+    try {
+      const { data, error } = await supabase
+        .from('user_cars')
+        .select(`
+          is_default,
+          car:cars (*)
+        `)
+        .eq('user_id', user.id)
+
+      if (error) throw error
+
+      if (data) {
+        const cars = data.map((d: any) => ({
+          ...d.car,
+          is_default: d.is_default
+        }))
+        const defaultCar = cars.find(c => c.is_default)
+        set({ 
+          userCars: cars,
+          selectedCarId: defaultCar?.id || (cars.length > 0 ? cars[0].id : null)
+        })
+      }
+    } catch (error) {
+      console.error('[Store Garage] Error fetching:', error)
+    }
+  },
+
+  addUserCar: async (car) => {
+    const { user, userCars } = get()
+    if (!user) return
+    if (userCars.some(c => c.id === car.id)) return
+    
+    try {
+      const isFirst = userCars.length === 0
+      const { error } = await supabase
+        .from('user_cars')
+        .insert({
+          user_id: user.id,
+          car_id: car.id,
+          is_default: isFirst
+        })
+
+      if (error) throw error
+      await get().fetchUserCars()
+      get().updateFilteredStations()
+    } catch (error) {
+      console.error('[Store Garage] Error adding:', error)
+    }
+  },
+
+  removeUserCar: async (carId) => {
+    const { user } = get()
+    if (!user) return
+
+    try {
+      const { error } = await supabase
+        .from('user_cars')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('car_id', carId)
+
+      if (error) throw error
+      await get().fetchUserCars()
+      get().updateFilteredStations()
+    } catch (error) {
+      console.error('[Store Garage] Error removing:', error)
+    }
+  },
+
+  setSelectedCarId: async (id) => {
+    const { user } = get()
+    if (!user) return
+
+    try {
+      // Atomic update: unset all, set one
+      await supabase
+        .from('user_cars')
+        .update({ is_default: false })
+        .eq('user_id', user.id)
+
+      if (id) {
+        await supabase
+          .from('user_cars')
+          .update({ is_default: true })
+          .eq('user_id', user.id)
+          .eq('car_id', id)
+      }
+
+      await get().fetchUserCars()
+      get().updateFilteredStations()
+    } catch (error) {
+      console.error('[Store Garage] Error setting default:', error)
+    }
+  },
+
   updateFilteredStations: () => {
-    const { stations, radius, selectedBrands, sortBy, showOnlyOpen, showOnlyUpdatedToday, stationDiscounts } = get()
+    const { stations, radius, selectedBrands, sortBy, showOnlyOpen, showOnlyUpdatedToday, stationDiscounts, userCars, selectedCarId } = get()
     
     let filtered = stations.map(s => ({
       ...s,
@@ -294,26 +413,53 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     // Sorting
     if (sortBy === 'smart' && filtered.length > 0) {
-      const distances = filtered.map(s => s.distancia || 0)
-      const prices = filtered.map(s => s.precioCombustible || 9.99)
+      const selectedCar = userCars.find(c => c.id === selectedCarId)
+      
+      if (selectedCar && selectedCar.consumo_l_100km > 0) {
+        // Advanced Smart Filter: Based on REAL COST
+        const consumo_km = selectedCar.consumo_l_100km / 100
+        const LITROS_REPOSTAJE_ESTIMADO = 45 // Valor promedio para el cálculo de ahorro
 
-      const minDist = Math.min(...distances)
-      const maxDist = Math.max(...distances)
-      const minPrice = Math.min(...prices)
-      const maxPrice = Math.max(...prices)
+        const scoredStations = filtered.map(s => {
+          const dist = s.distancia || 0
+          const precio = s.precioCombustible || 9.99
+          
+          // Coste de ir y volver
+          const costeDesplazamiento = dist * 2 * precio * consumo_km
+          // Ahorro potencial respecto a la gasolinera más cara del set (como referencia local)
+          // O simplemente usar el precio como factor de peso negativo
+          
+          // El score aquí representa el "gasto extra + precio"
+          // Queremos minimizar (precio * litros + costeDesplazamiento)
+          const gastoTotal = (precio * LITROS_REPOSTAJE_ESTIMADO) + costeDesplazamiento
+          
+          return { station: s, score: gastoTotal }
+        })
 
-      const norm = (val: number, min: number, max: number) => 
-        max === min ? 0 : (val - min) / (max - min)
+        scoredStations.sort((a, b) => a.score - b.score)
+        filtered = scoredStations.map(item => item.station)
+      } else {
+        // Fallback to basic smart normalization
+        const distances = filtered.map(s => s.distancia || 0)
+        const prices = filtered.map(s => s.precioCombustible || 9.99)
 
-      const scoredStations = filtered.map(s => {
-        const dScore = norm(s.distancia || 0, minDist, maxDist)
-        const pScore = norm(s.precioCombustible || 9.99, minPrice, maxPrice)
-        // Weighting: 50% distance, 50% price
-        return { station: s, score: dScore * 0.5 + pScore * 0.5 }
-      })
+        const minDist = Math.min(...distances)
+        const maxDist = Math.max(...distances)
+        const minPrice = Math.min(...prices)
+        const maxPrice = Math.max(...prices)
 
-      scoredStations.sort((a, b) => a.score - b.score)
-      filtered = scoredStations.map(item => item.station)
+        const norm = (val: number, min: number, max: number) => 
+          max === min ? 0 : (val - min) / (max - min)
+
+        const scoredStations = filtered.map(s => {
+          const dScore = norm(s.distancia || 0, minDist, maxDist)
+          const pScore = norm(s.precioCombustible || 9.99, minPrice, maxPrice)
+          return { station: s, score: dScore * 0.5 + pScore * 0.5 }
+        })
+
+        scoredStations.sort((a, b) => a.score - b.score)
+        filtered = scoredStations.map(item => item.station)
+      }
     } else {
       filtered.sort((a, b) => {
         if (sortBy === 'price') {
@@ -370,7 +516,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         searchHistory: [], 
         stations: [], 
         filteredStations: [],
-        selectedStationId: null 
+        selectedStationId: null,
+        userCars: [],
+        selectedCarId: null
       })
       console.log('✅ [Auth] Store state reset')
       
@@ -430,6 +578,7 @@ supabase.auth.onAuthStateChange(async (_event, session) => {
         selectedBrands: profile.selected_brands || [],
         searchHistory: profile.search_history || []
       })
+      await store.fetchUserCars()
       store.updateFilteredStations()
     } else {
       // First time user: save current local preferences as initial profile

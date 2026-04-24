@@ -1,7 +1,8 @@
 import { useState, useRef, useMemo } from 'react'
 import { useAppStore } from '../store/useAppStore'
 import { fetchSuggestions, geocodeAddress } from '../utils/geo'
-import { Search, MapPin, Fuel, Navigation, History, Filter, X, Tag, LogIn, LogOut, Zap, ArrowUpDown } from 'lucide-react'
+import { Search, MapPin, Fuel, Navigation, History, Filter, X, Tag, LogIn, LogOut, Zap, ArrowUpDown, Car } from 'lucide-react'
+import { Garage } from './Garage'
 
 export const Sidebar = () => {
   const {
@@ -26,7 +27,11 @@ export const Sidebar = () => {
     signOut,
     sortBy,
     setSortBy,
+    userCars,
+    selectedCarId,
   } = useAppStore()
+
+  const [isGarageOpen, setIsGarageOpen] = useState(false)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [suggestions, setSuggestions] = useState<any[]>([])
@@ -138,8 +143,11 @@ export const Sidebar = () => {
     }
   }
 
+  const activeCar = userCars.find(c => c.id === selectedCarId)
+
   return (
-    <aside className="w-[300px] md:w-[380px] max-w-[90vw] h-full bg-white flex flex-col shadow-2xl z-20 overflow-hidden custom-scrollbar">
+    <>
+      <aside className="w-[300px] md:w-[380px] max-w-[90vw] h-full bg-white flex flex-col shadow-2xl z-20 overflow-hidden custom-scrollbar">
       {/* Integrated Header: Identity + Auth */}
       <div className="p-6 pb-2 shrink-0 flex flex-col gap-4 animate-in fade-in duration-700">
         <div className="flex items-center justify-between">
@@ -275,6 +283,57 @@ export const Sidebar = () => {
             )}
           </div>
         </section>
+
+        {/* Garage Section - Highlighted if logged in */}
+        {user && (
+          <section className="space-y-4 pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-between px-1">
+              <div className="flex items-center gap-2 text-slate-800 font-bold border-l-4 border-blue-500 pl-1">
+                <Car size={18} />
+                <h2>Mi Garaje</h2>
+              </div>
+              <button 
+                onClick={() => setIsGarageOpen(true)}
+                className="text-[10px] font-black text-blue-600 hover:text-blue-700 uppercase tracking-tighter"
+              >
+                Gestionar
+              </button>
+            </div>
+            
+            <button
+              onClick={() => setIsGarageOpen(true)}
+              className={`w-full p-4 rounded-2xl border-2 transition-all text-left flex items-center gap-4 group ${
+                activeCar 
+                  ? 'border-blue-100 bg-blue-50/30 hover:border-blue-200' 
+                  : 'border-slate-100 bg-slate-50 hover:bg-slate-100 border-dashed'
+              }`}
+            >
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+                activeCar ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-400'
+              }`}>
+                <Car size={20} />
+              </div>
+              <div className="flex-1">
+                {activeCar ? (
+                  <>
+                    <h4 className="text-xs font-black text-slate-900 truncate">{activeCar.make} {activeCar.model}</h4>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase">{activeCar.year}</span>
+                      <span className="w-1 h-1 bg-slate-300 rounded-full" />
+                      <span className="text-[9px] font-black text-blue-600 uppercase">{activeCar.consumo_l_100km} L/100KM</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <h4 className="text-xs font-black text-slate-500">Sin vehículo configurado</h4>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase mt-0.5">Añade uno para el filtro inteligente</p>
+                  </>
+                )}
+              </div>
+              <Zap size={14} className={activeCar ? 'text-blue-500 animate-pulse' : 'text-slate-300'} />
+            </button>
+          </section>
+        )}
 
         {/* Fuel Type Section */}
         <section className="space-y-4 pt-2 border-t border-slate-100">
@@ -477,5 +536,8 @@ export const Sidebar = () => {
         )}
       </div>
     </aside>
+
+    {isGarageOpen && <Garage onClose={() => setIsGarageOpen(false)} />}
+    </>
   )
 }
