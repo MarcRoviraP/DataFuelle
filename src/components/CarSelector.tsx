@@ -32,19 +32,19 @@ export const CarSelector = ({ onClose }: CarSelectorProps) => {
         console.log('📦 [CarSelector] Using makes from cache')
         setMakes(makesCache)
       } else {
+        console.log('📡 [CarSelector] Calling RPC get_unique_car_makes...')
         const { data, error } = await supabase
-          .from('car_makes')
-          .select('make')
+          .rpc('get_unique_car_makes')
         
         if (error) {
-          console.error('❌ [CarSelector] Error fetching makes from view:', error)
+          console.error('❌ [CarSelector] RPC Error:', error)
           throw error
         }
         
-        console.log(`✅ [CarSelector] Received ${data?.length} unique makes from view`)
+        console.log(`✅ [CarSelector] RPC Success! Received ${data?.length} unique makes`)
         
-        const uniqueMakes = data.map(d => d.make)
-          .filter(m => isNaN(Number(m))) // Filter out numeric artifacts
+        const uniqueMakes = data.map((d: any) => d.make)
+          .filter((m: any) => isNaN(Number(m)))
         
         console.log(`✨ [CarSelector] Final processed makes: ${uniqueMakes.length}`)
         setMakes(uniqueMakes)
