@@ -29,8 +29,8 @@ interface AppState {
   // New Filters & Sort
   selectedBrands: string[]
   setSelectedBrands: (brands: string[]) => void
-  sortBy: 'price' | 'distance' | 'smart'
-  setSortBy: (sortBy: 'price' | 'distance' | 'smart') => void
+  sortBy: 'smart' | 'distance' | 'price'
+  setSortBy: (sortBy: 'smart' | 'distance' | 'price') => void
   showOnlyOpen: boolean
   setShowOnlyOpen: (open: boolean) => void
   showOnlyUpdatedToday: boolean
@@ -112,7 +112,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ selectedBrands: brands })
     get().updateFilteredStations()
   },
-  sortBy: 'price',
+  sortBy: 'smart',
   setSortBy: (sortBy) => {
     set({ sortBy })
     get().updateFilteredStations()

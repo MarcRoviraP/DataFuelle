@@ -312,12 +312,13 @@ export const Sidebar = () => {
           </div>
           <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 mb-2">
             <button
-              onClick={() => setSortBy('price')}
-              className={`flex-1 py-3 px-2 rounded-xl text-[10px] font-black uppercase tracking-tight transition-all text-center ${
-                sortBy === 'price' ? 'bg-white text-blue-600 shadow-md ring-1 ring-black/5' : 'text-slate-400 hover:text-slate-600'
+              onClick={() => setSortBy('smart')}
+              className={`flex-1 py-3 px-2 rounded-xl text-[10px] font-black uppercase tracking-tight transition-all flex items-center justify-center gap-1.5 ${
+                sortBy === 'smart' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:text-slate-600'
               }`}
             >
-              Precio
+              <Zap size={10} fill={sortBy === 'smart' ? "currentColor" : "none"} />
+              Smart
             </button>
             <button
               onClick={() => setSortBy('distance')}
@@ -328,13 +329,12 @@ export const Sidebar = () => {
               Distancia
             </button>
             <button
-              onClick={() => setSortBy('smart')}
-              className={`flex-1 py-3 px-2 rounded-xl text-[10px] font-black uppercase tracking-tight transition-all flex items-center justify-center gap-1.5 ${
-                sortBy === 'smart' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:text-slate-600'
+              onClick={() => setSortBy('price')}
+              className={`flex-1 py-3 px-2 rounded-xl text-[10px] font-black uppercase tracking-tight transition-all text-center ${
+                sortBy === 'price' ? 'bg-white text-blue-600 shadow-md ring-1 ring-black/5' : 'text-slate-400 hover:text-slate-600'
               }`}
             >
-              <Zap size={10} fill={sortBy === 'smart' ? "currentColor" : "none"} />
-              Smart
+              Precio
             </button>
           </div>
         </section>
