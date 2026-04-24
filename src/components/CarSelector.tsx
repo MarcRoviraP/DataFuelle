@@ -33,14 +33,15 @@ export const CarSelector = ({ onClose }: CarSelectorProps) => {
         setMakes(makesCache)
       } else {
         console.log('📡 [CarSelector] Calling RPC get_unique_car_makes...')
-        const { data, error } = await supabase
-          .rpc('get_unique_car_makes')
-        
+        const { data, error } = await supabase.rpc('get_unique_car_makes')
+
         if (error) {
-          console.error('❌ [CarSelector] RPC Error:', error)
+          console.error('❌ [CarSelector] RPC Error Details:', error)
+          // Si el error es un tema de red, a veces viene vacío o con código de red
+          alert('Error de conexión con el garaje. Revisá tu conexión o bloqueadores.')
           throw error
         }
-        
+
         console.log(`✅ [CarSelector] RPC Success! Received ${data?.length} unique makes`)
         
         const uniqueMakes = data.map((d: any) => d.make)
