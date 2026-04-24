@@ -29,23 +29,17 @@ export const CarSelector = ({ onClose }: CarSelectorProps) => {
     console.log('📡 [CarSelector] Fetching makes...')
     try {
       if (makesCache.length > 0) {
-        console.log('📦 [CarSelector] Using makes from cache')
         setMakes(makesCache)
       } else {
-        console.log('📡 [CarSelector] Fetching makes...')
         const { data, error } = await supabase
           .from('car_makes')
           .select('make')
 
-        if (error) {
-          console.error('❌ [CarSelector] Error:', error)
-          throw error
-        }
+        if (error) throw error
 
         const uniqueMakes = data.map((d: any) => d.make)
           .filter((m: any) => isNaN(Number(m)))
         
-        console.log(`✅ [CarSelector] Loaded ${uniqueMakes.length} makes`)
         setMakes(uniqueMakes)
         setMakesCache(uniqueMakes)
       }
@@ -59,7 +53,6 @@ export const CarSelector = ({ onClose }: CarSelectorProps) => {
   const fetchModels = async (make: string) => {
     setLoading(true)
     setSelectedMake(make)
-    console.log(`📡 [CarSelector] Fetching models for make: ${make}...`)
     try {
       const { data, error } = await supabase
         .from('cars')
@@ -67,12 +60,7 @@ export const CarSelector = ({ onClose }: CarSelectorProps) => {
         .eq('make', make)
         .order('model', { ascending: true })
       
-      if (error) {
-        console.error(`❌ [CarSelector] Error fetching models for ${make}:`, error)
-        throw error
-      }
-      
-      console.log(`✅ [CarSelector] Received ${data?.length} models for ${make}`)
+      if (error) throw error
       setModels(data as Car[])
       setStep('model')
       setSearch('')
