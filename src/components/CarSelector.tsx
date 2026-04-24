@@ -32,22 +32,20 @@ export const CarSelector = ({ onClose }: CarSelectorProps) => {
         console.log('📦 [CarSelector] Using makes from cache')
         setMakes(makesCache)
       } else {
-        console.log('📡 [CarSelector] Calling RPC get_unique_car_makes...')
-        const { data, error } = await supabase.rpc('get_unique_car_makes')
+        console.log('📡 [CarSelector] Fetching makes...')
+        const { data, error } = await supabase
+          .from('car_makes')
+          .select('make')
 
         if (error) {
-          console.error('❌ [CarSelector] RPC Error Details:', error)
-          // Si el error es un tema de red, a veces viene vacío o con código de red
-          alert('Error de conexión con el garaje. Revisá tu conexión o bloqueadores.')
+          console.error('❌ [CarSelector] Error:', error)
           throw error
         }
 
-        console.log(`✅ [CarSelector] RPC Success! Received ${data?.length} unique makes`)
-        
         const uniqueMakes = data.map((d: any) => d.make)
           .filter((m: any) => isNaN(Number(m)))
         
-        console.log(`✨ [CarSelector] Final processed makes: ${uniqueMakes.length}`)
+        console.log(`✅ [CarSelector] Loaded ${uniqueMakes.length} makes`)
         setMakes(uniqueMakes)
         setMakesCache(uniqueMakes)
       }
