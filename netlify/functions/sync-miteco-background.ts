@@ -182,4 +182,3 @@ export const handler = async () => {
     console.error("❌ [DEBUG] Critical Netlify Sync Error:", error);
   }
 };
-};
