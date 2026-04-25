@@ -4,7 +4,6 @@
 
 [functions]
   directory = "netlify/functions"
-  node_version = "20"
 
 # Programamos la sincronización para las 00:00 y 12:00 (UTC)
 [functions."sync-miteco-background"]

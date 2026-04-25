@@ -13,7 +13,7 @@ const parseMitecoNumber = (val: string | number): number => {
 };
 
 export const handler = async (event: any) => {
-  const startTime = Date.now();
+  const startTime = Date.now(); 
   
   // Bloqueo de ejecución manual: El cron de Netlify no envía httpMethod
   if (event?.httpMethod) {
