@@ -12,30 +12,35 @@ const parseMitecoNumber = (val: string | number): number => {
 
 export const handler = async () => {
   const startTime = Date.now();
-  console.log("🚀 Starting background sync from Netlify (MITECO)...");
+  console.log("🚀 [DEBUG] Starting background sync from Netlify...");
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    console.error("❌ Missing Supabase environment variables");
+    console.error("❌ [DEBUG] Error: Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables.");
     return;
   }
 
   try {
+    console.log(`📡 [DEBUG] Fetching from MITECO: ${API_URL}`);
     const response = await fetch(API_URL, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
       }
     });
 
-    if (!response.ok) throw new Error(`MITECO API failed with status ${response.status}`);
+    if (!response.ok) {
+      console.error(`❌ [DEBUG] MITECO API fetch failed. Status: ${response.status} ${response.statusText}`);
+      return;
+    }
 
     const json = await response.json();
     const stationsList = json.ListaEESSPrecio;
     
     if (!Array.isArray(stationsList) || stationsList.length === 0) {
-      throw new Error("Invalid or empty response from MITECO API");
+      console.error("❌ [DEBUG] Invalid or empty response from MITECO API. Check JSON structure.");
+      return;
     }
 
-    console.log(`📡 Received ${stationsList.length} stations from Ministry. Syncing metadata and prices...`);
+    console.log(`✅ [DEBUG] Successfully received ${stationsList.length} stations. Initializing Supabase client...`);
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const recordedAt = new Date().toISOString();
@@ -45,17 +50,25 @@ export const handler = async () => {
     let totalSkippedHistory = 0;
     let stationsUpdated = 0;
 
+    console.log(`📦 [DEBUG] Starting processing in chunks of ${CHUNK_SIZE}...`);
+
     for (let i = 0; i < stationsList.length; i += CHUNK_SIZE) {
+      console.log(`  -> Processing chunk ${Math.floor(i/CHUNK_SIZE) + 1} / ${Math.ceil(stationsList.length/CHUNK_SIZE)}...`);
       const chunk = stationsList.slice(i, i + CHUNK_SIZE);
       const chunkStationIds = chunk.map((s: any) => parseInt(s.IDEESS)).filter(Boolean);
 
       // 1. Get latest history for comparison
-      const { data: latestRecords } = await supabase
+      const { data: latestRecords, error: fetchError } = await supabase
         .from("price_history")
         .select("station_id, price_95, price_98, price_diesel")
         .in("station_id", chunkStationIds)
         .order("station_id")
         .order("recorded_at", { ascending: false });
+
+      if (fetchError) {
+        console.error(`  ❌ [DEBUG] Error fetching history for chunk ${i}:`, fetchError);
+        continue;
+      }
 
       const latestMap = new Map();
       latestRecords?.forEach(r => {
@@ -96,8 +109,11 @@ export const handler = async () => {
       }).filter(Boolean);
 
       const { error: stationError } = await supabase.from("stations").upsert(stationsData, { onConflict: "external_id" });
-      if (stationError) console.error(`Error upserting stations chunk [${i}]:`, stationError);
-      else stationsUpdated += (stationsData as any[]).length;
+      if (stationError) {
+        console.error(`  ❌ [DEBUG] Error upserting stations chunk [${i}]:`, stationError);
+      } else {
+        stationsUpdated += (stationsData as any[]).length;
+      }
 
       // 3. Prepare Price History
       const pricesToInsert = chunk.map((s: any) => {
@@ -131,16 +147,17 @@ export const handler = async () => {
 
       if (pricesToInsert.length > 0) {
         const { error: priceError } = await supabase.from("price_history").insert(pricesToInsert);
-        if (priceError) console.error(`Error in prices history [${i}]:`, priceError);
+        if (priceError) console.error(`  ❌ [DEBUG] Error in prices history [${i}]:`, priceError);
         else totalInsertedHistory += pricesToInsert.length;
       }
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-    console.log(`✅ Netlify Background Sync Completed in ${duration}s!`);
-    console.log(`Stats: Updated ${stationsUpdated} stations, Inserted ${totalInsertedHistory} history records.`);
+    console.log(`✅ [DEBUG] Netlify Background Sync Completed in ${duration}s!`);
+    console.log(`📊 Stats: Updated ${stationsUpdated} stations, Inserted ${totalInsertedHistory} history records, Skipped ${totalSkippedHistory} identical prices.`);
 
   } catch (error) {
-    console.error("❌ Critical Netlify Sync Error:", error);
+    console.error("❌ [DEBUG] Critical Netlify Sync Error:", error);
   }
+};
 };
