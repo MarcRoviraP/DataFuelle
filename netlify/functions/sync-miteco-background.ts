@@ -2,7 +2,9 @@ import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-const API_URL = "https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestres/";
+const API_URL = "https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestres";
+// Fallback alternativo si el de arriba falla
+const API_URL_ALT = "https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestres/";
 
 const parseMitecoNumber = (val: string | number): number => {
   if (typeof val === "number") return val;
@@ -21,11 +23,20 @@ export const handler = async () => {
 
   try {
     console.log(`📡 [DEBUG] Fetching from MITECO: ${API_URL}`);
-    const response = await fetch(API_URL, {
+    let response = await fetch(API_URL, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
       }
     });
+
+    if (!response.ok) {
+      console.warn(`⚠️ [DEBUG] First URL failed (${response.status}). Trying fallback URL...`);
+      response = await fetch(API_URL_ALT, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+      });
+    }
 
     if (!response.ok) {
       console.error(`❌ [DEBUG] MITECO API fetch failed. Status: ${response.status} ${response.statusText}`);
@@ -41,8 +52,19 @@ export const handler = async () => {
     }
 
     console.log(`✅ [DEBUG] Successfully received ${stationsList.length} stations. Initializing Supabase client...`);
+    console.log(`🔗 [DEBUG] Supabase URL: ${SUPABASE_URL}`);
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    
+    // Test connection
+    console.log("⏳ [DEBUG] Testing Supabase connection with a simple query...");
+    const { data: testData, error: testError } = await supabase.from("stations").select("count", { count: "exact", head: true });
+    if (testError) {
+      console.error("❌ [DEBUG] Supabase connection test failed:", testError);
+      return;
+    }
+    console.log("✅ [DEBUG] Supabase connection test successful!");
+
     const recordedAt = new Date().toISOString();
 
     const CHUNK_SIZE = 500; 
