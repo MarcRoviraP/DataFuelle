@@ -1,9 +1,8 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
+import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-
-const API_URL = "http://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestres";
+const SUPABASE_URL = process.env.SUPABASE_URL || '';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const API_URL = "https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestres/";
 
 const parseMitecoNumber = (val: string | number): number => {
   if (typeof val === "number") return val;
@@ -11,31 +10,23 @@ const parseMitecoNumber = (val: string | number): number => {
   return parseFloat(val.replace(",", ".")) || 0;
 };
 
-async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3): Promise<Response> {
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      const response = await fetch(url, options);
-      if (response.ok) return response;
-      console.warn(`Attempt ${i + 1} failed with status ${response.status}`);
-    } catch (err) {
-      console.error(`Attempt ${i + 1} failed: ${err.message}`);
-      if (i === maxRetries - 1) throw err;
-    }
-    await new Promise(r => setTimeout(r, 1500 * Math.pow(2, i)));
-  }
-  throw new Error("Failed to fetch after retries");
-}
-
-Deno.serve(async (req: Request) => {
+export const handler = async () => {
   const startTime = Date.now();
-  console.log("🚀 Starting fuel price synchronization (Priceil mirror)...");
+  console.log("🚀 Starting background sync from Netlify (MITECO)...");
+
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    console.error("❌ Missing Supabase environment variables");
+    return;
+  }
 
   try {
-    const response = await fetchWithRetry(API_URL, {
+    const response = await fetch(API_URL, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
       }
     });
+
+    if (!response.ok) throw new Error(`MITECO API failed with status ${response.status}`);
 
     const json = await response.json();
     const stationsList = json.ListaEESSPrecio;
@@ -50,7 +41,6 @@ Deno.serve(async (req: Request) => {
     const recordedAt = new Date().toISOString();
 
     const CHUNK_SIZE = 500; 
-    let totalProcessed = 0;
     let totalInsertedHistory = 0;
     let totalSkippedHistory = 0;
     let stationsUpdated = 0;
@@ -144,30 +134,13 @@ Deno.serve(async (req: Request) => {
         if (priceError) console.error(`Error in prices history [${i}]:`, priceError);
         else totalInsertedHistory += pricesToInsert.length;
       }
-
-      totalProcessed += chunk.length;
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-    console.log(`✅ Multi-Sync Completed in ${duration}s!`);
-
-    return new Response(JSON.stringify({ 
-      success: true, 
-      stats: {
-        total: stationsList.length,
-        updated_stations: stationsUpdated,
-        inserted_history: totalInsertedHistory,
-        skipped_history: totalSkippedHistory,
-        duration_seconds: parseFloat(duration)
-      },
-      timestamp: recordedAt 
-    }), { headers: { "Content-Type": "application/json" } });
+    console.log(`✅ Netlify Background Sync Completed in ${duration}s!`);
+    console.log(`Stats: Updated ${stationsUpdated} stations, Inserted ${totalInsertedHistory} history records.`);
 
   } catch (error) {
-    console.error("❌ Critical Multi-Sync Error:", error);
-    return new Response(JSON.stringify({ success: false, error: (error as Error).message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
+    console.error("❌ Critical Netlify Sync Error:", error);
   }
-});
+};
