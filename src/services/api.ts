@@ -31,12 +31,30 @@ export interface Station {
   lastUpdate: string
 }
 
-const API_BASE_URL = 'https://api.precioil.es'
+const MITECO_URL = 'https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestres/'
+
+// In-memory cache for MITECO data
+let mitecoCache: {
+  data: any[]
+  timestamp: number
+} | null = null
+
+const CACHE_DURATION = 30 * 60 * 1000 // 30 minutes
+
+const parseMitecoNumber = (val: string): number => {
+  if (!val) return 0
+  return parseFloat(val.replace(',', '.')) || 0
+}
+
+import { calculateDistance } from '../utils/geo'
 
 export const fetchFuelTypes = async (): Promise<FuelType[]> => {
-  const response = await fetch(`${API_BASE_URL}/fuel-types`)
-  if (!response.ok) throw new Error('Failed to fetch fuel types')
-  return response.json()
+  // Return static fuel types since MITECO is different
+  return [
+    { idFuelType: 9, fuelTypeName: 'Gasolina 95' },
+    { idFuelType: 12, fuelTypeName: 'Gasolina 98' },
+    { idFuelType: 6, fuelTypeName: 'Diésel' },
+  ]
 }
 
 const cleanStationName = (name: string) => {
@@ -57,70 +75,72 @@ export const fetchStationsByRadius = async (
   radio: number,
   idFuelType: number
 ): Promise<Station[]> => {
-  const url = new URL(`${API_BASE_URL}/estaciones/radio`)
-  url.searchParams.append('latitud', latitud.toString())
-  url.searchParams.append('longitud', longitud.toString())
-  url.searchParams.append('radio', radio.toString())
-  url.searchParams.append('idFuelType', idFuelType.toString())
-  url.searchParams.append('limite', '1000')
-
-  console.log('[API Request] GET', url.toString())
-
-  const response = await fetch(url.toString())
-  if (!response.ok) {
-    const errorBody = await response.text()
-    console.error(`[API Error] Status ${response.status}:`, errorBody)
-    throw new Error(`Failed to fetch stations: ${response.status}`)
-  }
-  const data = await response.json()
-  console.log(`[API Success] Found ${data.length} stations`)
-
-  const fuelKeyMap: Record<number, string> = {
-    1: 'Biodiesel',
-    2: 'Bioetanol',
-    3: 'GNC',
-    4: 'GNL',
-    5: 'GLP',
-    6: 'Diesel',
-    7: 'GasoleoB',
-    8: 'DieselPremium',
-    9: 'Gasolina95',
-    10: 'Gasolina95',
-    11: 'Gasolina95_E5_Premium',
-    12: 'Gasolina98',
-    13: 'Gasolina98',
+  const now = Date.now()
+  
+  let rawStations: any[] = []
+  if (mitecoCache && (now - mitecoCache.timestamp) < CACHE_DURATION) {
+    console.log('[MITECO] Using cached data')
+    rawStations = mitecoCache.data
+  } else {
+    console.log('[MITECO] Fetching fresh data from Ministry...')
+    try {
+      const response = await fetch(MITECO_URL)
+      if (!response.ok) throw new Error(`MITECO API Error: ${response.status}`)
+      const json = await response.json()
+      rawStations = json.ListaEESSPrecio || []
+      mitecoCache = { data: rawStations, timestamp: now }
+      console.log(`[MITECO] Loaded ${rawStations.length} stations`)
+    } catch (err) {
+      console.error('[MITECO Fetch Error]', err)
+      return []
+    }
   }
 
-  const key = fuelKeyMap[idFuelType] || 'Diesel'
+  // Map MITECO fields to our Station interface
+  const fuelKey = idFuelType === 9 ? 'Precio Gasolina 95 E5' : 
+                  idFuelType === 12 ? 'Precio Gasolina 98 E5' : 
+                  'Precio Gasoleo A'
 
-  return data.map((s: any) => ({
-    ...s,
-    nombreEstacion: cleanStationName(s.nombreEstacion || s.rotulo || s.marca || 'Estación sin nombre'),
-    precioCombustible: s[key] || 0,
-    precioG95: s['Gasolina95'] || null,
-    precioG98: s['Gasolina98'] || null,
-    precioDiesel: s['Diesel'] || null,
-  }))
+  return rawStations
+    .map((s: any) => {
+      const sLat = parseMitecoNumber(s['Latitud'])
+      const sLon = parseMitecoNumber(s['Longitud (WGS84)'])
+      const dist = calculateDistance(latitud, longitud, sLat, sLon)
+      
+      const price = parseMitecoNumber(s[fuelKey])
+      
+      return {
+        idEstacion: parseInt(s['IDEESS']),
+        nombreEstacion: cleanStationName(s['Rótulo'] || 'Estación sin nombre'),
+        direccion: s['Dirección'],
+        municipio: s['Municipio'],
+        provincia: s['Provincia'],
+        latitud: sLat,
+        longitud: sLon,
+        horario: s['Horario'],
+        marca: s['Rótulo'],
+        margen: s['Margen'],
+        codPostal: s['C.P.'],
+        precioCombustible: price,
+        precioBase: price,
+        precioG95: parseMitecoNumber(s['Precio Gasolina 95 E5']),
+        precioG98: parseMitecoNumber(s['Precio Gasolina 98 E5']),
+        precioDiesel: parseMitecoNumber(s['Precio Gasoleo A']),
+        distancia: dist,
+        lastUpdate: new Date().toISOString()
+      }
+    })
+    .filter(s => s.distancia <= radio && s.precioCombustible > 0)
+    .sort((a, b) => a.distancia - b.distancia)
 }
 
 export const fetchRecentPriceChanges = async (
-  idFuelType: number,
-  params?: { fechaInicio?: string; fechaFin?: string }
+  _idFuelType: number,
+  _params?: { fechaInicio?: string; fechaFin?: string }
 ): Promise<any[]> => {
-  const today = new Date()
-  const yesterday = new Date(today)
-  yesterday.setDate(today.getDate() - 1)
-
-  const fmt = (d: Date) => d.toISOString().split('T')[0]
-  
-  const fechaInicio = params?.fechaInicio || fmt(yesterday)
-  const fechaFin = params?.fechaFin || fmt(today)
-
-  const url = `${API_BASE_URL}/cambios/precios?idFuelType=${idFuelType}&fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`
-  const response = await fetch(url)
-  if (!response.ok) return []
-  const data = await response.json()
-  return Array.isArray(data) ? data : []
+  // MITECO API doesn't provide deltas directly. 
+  // We return empty for now to maintain store compatibility.
+  return []
 }
 export const fetchStationHistory = async (idEstacion: number, days: number | null = 30): Promise<any[]> => {
   console.log('🚀 [API] fetchStationHistory LLAMADA para estación:', idEstacion, 'días:', days);
