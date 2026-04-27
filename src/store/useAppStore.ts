@@ -581,53 +581,74 @@ supabase.auth.onAuthStateChange(async (event, session) => {
   
   try {
     if (user) {
-      console.log('📡 [Auth] Fetching user profile...')
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 8000)
 
-      if (error && error.code !== 'PGRST116') {
-        console.warn('⚠️ [Auth] Profile fetch warning:', error.message)
-      }
+      try {
+        console.log('📡 [Auth] Fetching user profile...')
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single()
 
-      if (profile) {
-        console.log('✅ [Auth] Profile found, restoring state')
-        const oldRadius = useAppStore.getState().radius
-        const oldFuel = useAppStore.getState().selectedFuelTypeId
+        clearTimeout(timeoutId)
 
-        useAppStore.setState({
-          selectedFuelTypeId: profile.fuel_type_id,
-          radius: profile.search_radius,
-          showOnlyOpen: profile.show_only_open,
-          showOnlyUpdatedToday: profile.show_only_updated_today,
-          selectedBrands: profile.selected_brands || [],
-          searchHistory: profile.search_history || [],
-          stationDiscounts: new Map(profile.station_discounts || [])
-        })
-
-        console.log('🏎️ [Auth] Loading garage...')
-        await store.fetchUserCars()
-        
-        // If profile settings change the scope of the current data, re-fetch
-        if (profile.search_radius > oldRadius || profile.fuel_type_id !== oldFuel) {
-          console.log('🔄 [Auth] Filters changed, re-fetching stations...')
-          await store.fetchStations()
-        } else {
-          store.updateFilteredStations()
+        if (error && error.code !== 'PGRST116') {
+          console.warn('⚠️ [Auth] Profile fetch warning:', error.message)
         }
-      } else {
-        console.log('ℹ️ [Auth] No profile yet, sync current defaults')
-        // Only sync if we're not in initial load or if explicitly needed
-        if (!isInitialLoad) {
-          store.syncProfile()
+
+        if (profile) {
+          console.log('✅ [Auth] Profile found, restoring state')
+          const oldRadius = useAppStore.getState().radius
+          const oldFuel = useAppStore.getState().selectedFuelTypeId
+
+          useAppStore.setState({
+            selectedFuelTypeId: profile.fuel_type_id,
+            radius: profile.search_radius,
+            showOnlyOpen: profile.show_only_open,
+            showOnlyUpdatedToday: profile.show_only_updated_today,
+            selectedBrands: profile.selected_brands || [],
+            searchHistory: profile.search_history || [],
+            stationDiscounts: new Map(profile.station_discounts || [])
+          })
+
+          console.log('🏎️ [Auth] Loading garage...')
+          const garageController = new AbortController()
+          const garageTimeout = setTimeout(() => garageController.abort(), 5000)
+          try {
+            await store.fetchUserCars()
+            clearTimeout(garageTimeout)
+          } catch (e) {
+            clearTimeout(garageTimeout)
+            console.warn('⚠️ [Auth] Garage fetch timed out or failed')
+          }
+          
+          if (profile.search_radius > oldRadius || profile.fuel_type_id !== oldFuel) {
+            console.log('🔄 [Auth] Filters changed, re-fetching stations...')
+            await store.fetchStations()
+          } else {
+            store.updateFilteredStations()
+          }
+        } else {
+          console.log('ℹ️ [Auth] No profile yet, sync current defaults')
+          if (!isInitialLoad) {
+            store.syncProfile()
+          }
+        }
+      } catch (err: any) {
+        clearTimeout(timeoutId)
+        if (err.name === 'AbortError') {
+          console.error('❌ [Auth] Profile fetch timed out after 8s')
+        } else {
+          console.error('❌ [Auth] Critical Error in Listener:', err)
         }
       }
     }
-  } catch (err) {
-    console.error('❌ [Auth] Critical Error in Listener:', err)
+  } catch (err: any) {
+    console.error('❌ [Auth] Top-level error in Listener:', err)
   } finally {
+    store.setIsLoading(false)
     useAppStore.setState({ isLoadingAuth: false })
     isInitialLoad = false
     console.log('🏁 [Auth] Initial load sequence complete')

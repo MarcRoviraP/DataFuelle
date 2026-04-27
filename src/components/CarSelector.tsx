@@ -27,6 +27,9 @@ export const CarSelector = ({ onClose }: CarSelectorProps) => {
   const fetchMakes = async () => {
     setLoading(true)
     console.log('📡 [CarSelector] Fetching makes...')
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 8000)
+
     try {
       if (makesCache.length > 0) {
         setMakes(makesCache)
@@ -34,7 +37,8 @@ export const CarSelector = ({ onClose }: CarSelectorProps) => {
         const { data, error } = await supabase
           .from('car_makes')
           .select('make')
-
+        
+        clearTimeout(timeoutId)
         if (error) throw error
 
         const uniqueMakes = data.map((d: any) => d.make)
@@ -43,8 +47,13 @@ export const CarSelector = ({ onClose }: CarSelectorProps) => {
         setMakes(uniqueMakes)
         setMakesCache(uniqueMakes)
       }
-    } catch (err) {
-      console.error('💥 [CarSelector] Critical error in fetchMakes:', err)
+    } catch (err: any) {
+      clearTimeout(timeoutId)
+      if (err.name === 'AbortError') {
+        console.error('💥 [CarSelector] Fetch makes timed out after 8s')
+      } else {
+        console.error('💥 [CarSelector] Critical error in fetchMakes:', err)
+      }
     } finally {
       setLoading(false)
     }
@@ -53,6 +62,9 @@ export const CarSelector = ({ onClose }: CarSelectorProps) => {
   const fetchModels = async (make: string) => {
     setLoading(true)
     setSelectedMake(make)
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 8000)
+
     try {
       const { data, error } = await supabase
         .from('cars')
@@ -60,12 +72,18 @@ export const CarSelector = ({ onClose }: CarSelectorProps) => {
         .eq('make', make)
         .order('model', { ascending: true })
       
+      clearTimeout(timeoutId)
       if (error) throw error
       setModels(data as Car[])
       setStep('model')
       setSearch('')
-    } catch (err) {
-      console.error('💥 [CarSelector] Critical error in fetchModels:', err)
+    } catch (err: any) {
+      clearTimeout(timeoutId)
+      if (err.name === 'AbortError') {
+        console.error('💥 [CarSelector] Fetch models timed out after 8s')
+      } else {
+        console.error('💥 [CarSelector] Critical error in fetchModels:', err)
+      }
     } finally {
       setLoading(false)
     }
