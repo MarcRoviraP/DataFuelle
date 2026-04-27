@@ -93,13 +93,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   setIsSidebarOpen: (isOpen) => set({ isSidebarOpen: isOpen }),
   viewMode: 'map',
   setViewMode: (mode) => set({ viewMode: mode }),
-  currentLocation: JSON.parse(localStorage.getItem('lastLocation') || '{"lat": 39.4699, "lon": -0.3763}'),
+  currentLocation: { lat: 39.4699, lon: -0.3763 }, // Default to Valencia
   setCurrentLocation: (lat, lon) => {
     const location = { lat, lon }
-    localStorage.setItem('lastLocation', JSON.stringify(location))
     set({ currentLocation: location })
   },
-  stationDiscounts: new Map(JSON.parse(localStorage.getItem('stationDiscounts') || '[]')),
+  stationDiscounts: new Map(),
   setStationDiscount: (stationId, discount) => {
     const discounts = new Map(get().stationDiscounts)
     if (discount <= 0) {
@@ -107,7 +106,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     } else {
       discounts.set(stationId, discount)
     }
-    localStorage.setItem('stationDiscounts', JSON.stringify(Array.from(discounts.entries())))
     set({ stationDiscounts: discounts })
     get().updateFilteredStations()
   },
@@ -177,7 +175,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     })
 
     set({ stations: stationsWithChanges })
-    localStorage.setItem('lastStations', JSON.stringify(stationsWithChanges))
     get().updateFilteredStations()
   },
 
@@ -211,7 +208,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     get().updateFilteredStations()
   },
 
-  filteredStations: JSON.parse(localStorage.getItem('lastStations') || '[]'),
+  filteredStations: [],
   setFilteredStations: (stations) => set({ filteredStations: stations }),
 
   selectedStationId: null,
@@ -220,15 +217,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   isLoading: false,
   setIsLoading: (isLoading) => set({ isLoading }),
 
-  searchHistory: JSON.parse(localStorage.getItem('searchHistory') || '[]'),
+  searchHistory: [],
   addToHistory: (query) => {
     const history = get().searchHistory
     const newHistory = [query, ...history.filter((q) => q !== query)].slice(0, 10)
-    localStorage.setItem('searchHistory', JSON.stringify(newHistory))
     set({ searchHistory: newHistory })
   },
   clearHistory: () => {
-    localStorage.removeItem('searchHistory')
     set({ searchHistory: [] })
   },
 
@@ -511,13 +506,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         throw error
       }
       console.log('✅ [Auth] Supabase sign out call successful')
-      
-      console.log('🧹 [Auth] Clearing local storage keys...')
-      localStorage.removeItem('lastStations')
-      localStorage.removeItem('searchHistory')
-      localStorage.removeItem('lastLocation')
-      localStorage.removeItem('stationDiscounts')
-      console.log('✅ [Auth] Local storage cleared')
       
       console.log('💾 [Auth] Resetting store state...')
       set({ 
