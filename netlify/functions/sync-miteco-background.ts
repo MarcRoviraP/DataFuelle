@@ -16,15 +16,8 @@ export const handler = async (event: any) => {
   const startTime = Date.now(); 
   
   // Bloqueo de ejecución manual: El cron de Netlify no envía httpMethod
-  if (event?.httpMethod) {
-    console.log("🚫 [DEBUG] Intento de ejecución manual bloqueado.");
-    return {
-      statusCode: 403,
-      body: JSON.stringify({ error: "Solo ejecución programada permitida." })
-    };
-  }
-
-  console.log("🚀 [DEBUG] Starting scheduled sync from Netlify...");
+  // Permitimos la ejecución vía cron o manual asíncrona
+  console.log("🚀 [DEBUG] Starting sync process...");
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     console.error("❌ [DEBUG] Error: Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables.");

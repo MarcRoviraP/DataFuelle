@@ -5,7 +5,7 @@
 [functions]
   directory = "netlify/functions"
 
-# Programamos la sincronización para las 00:00 y 12:00 (UTC)
-[functions."sync-miteco-background"]
+# Programamos el disparador (trigger) para las 00:00 y 12:00 (UTC)
+[functions."sync-miteco-cron"]
   schedule = "0 0,12 * * *"
  
