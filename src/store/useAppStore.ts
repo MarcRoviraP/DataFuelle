@@ -1,9 +1,11 @@
 import { create } from 'zustand'
 import type { Station, FuelType } from '../services/api'
 import { fetchStationsByRadius, fetchRecentPriceChanges } from '../services/api'
+import type { User } from '@supabase/supabase-js'
 import { calculateDistance } from '../utils/geo'
 import { supabase } from '../services/supabaseClient'
-import type { User } from '@supabase/supabase-js'
+
+let syncTimeout: any = null
 
 export interface Car {
   id: number
@@ -93,13 +95,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   setIsSidebarOpen: (isOpen) => set({ isSidebarOpen: isOpen }),
   viewMode: 'map',
   setViewMode: (mode) => set({ viewMode: mode }),
-  currentLocation: JSON.parse(localStorage.getItem('lastLocation') || '{"lat": 39.4699, "lon": -0.3763}'),
+  currentLocation: { lat: 39.4699, lon: -0.3763 },
   setCurrentLocation: (lat, lon) => {
-    const location = { lat, lon }
-    localStorage.setItem('lastLocation', JSON.stringify(location))
-    set({ currentLocation: location })
+    set({ currentLocation: { lat, lon } })
   },
-  stationDiscounts: new Map(JSON.parse(localStorage.getItem('stationDiscounts') || '[]')),
+  stationDiscounts: new Map(),
   setStationDiscount: (stationId, discount) => {
     const discounts = new Map(get().stationDiscounts)
     if (discount <= 0) {
@@ -107,7 +107,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     } else {
       discounts.set(stationId, discount)
     }
-    localStorage.setItem('stationDiscounts', JSON.stringify(Array.from(discounts.entries())))
     set({ stationDiscounts: discounts })
     get().updateFilteredStations()
   },
@@ -177,7 +176,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     })
 
     set({ stations: stationsWithChanges })
-    localStorage.setItem('lastStations', JSON.stringify(stationsWithChanges))
     get().updateFilteredStations()
   },
 
@@ -211,7 +209,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     get().updateFilteredStations()
   },
 
-  filteredStations: JSON.parse(localStorage.getItem('lastStations') || '[]'),
+  filteredStations: [],
   setFilteredStations: (stations) => set({ filteredStations: stations }),
 
   selectedStationId: null,
@@ -220,16 +218,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   isLoading: false,
   setIsLoading: (isLoading) => set({ isLoading }),
 
-  searchHistory: JSON.parse(localStorage.getItem('searchHistory') || '[]'),
+  searchHistory: [],
   addToHistory: (query) => {
     const history = get().searchHistory
     const newHistory = [query, ...history.filter((q) => q !== query)].slice(0, 10)
-    localStorage.setItem('searchHistory', JSON.stringify(newHistory))
     set({ searchHistory: newHistory })
+    get().syncProfile()
   },
   clearHistory: () => {
-    localStorage.removeItem('searchHistory')
     set({ searchHistory: [] })
+    get().syncProfile()
   },
 
   fetchStations: async () => {
@@ -512,13 +510,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       console.log('✅ [Auth] Supabase sign out call successful')
       
-      console.log('🧹 [Auth] Clearing local storage keys...')
-      localStorage.removeItem('lastStations')
-      localStorage.removeItem('searchHistory')
-      localStorage.removeItem('lastLocation')
-      localStorage.removeItem('stationDiscounts')
-      console.log('✅ [Auth] Local storage cleared')
-      
       console.log('💾 [Auth] Resetting store state...')
       set({ 
         user: null, 
@@ -527,7 +518,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         filteredStations: [],
         selectedStationId: null,
         userCars: [],
-        selectedCarId: null
+        selectedCarId: null,
+        stationDiscounts: new Map(),
+        currentLocation: { lat: 39.4699, lon: -0.3763 }
       })
       console.log('✅ [Auth] Store state reset')
       
@@ -536,42 +529,51 @@ export const useAppStore = create<AppState>((set, get) => ({
       
     } catch (error) {
       console.error('💥 [Auth] Critical error during sign out:', error)
-      // Force local sign out and reload anyway if the API fails
-      console.warn('⚠️ [Auth] Attempting forced local reset...')
       set({ user: null })
       window.location.reload()
     }
   },
 
   syncProfile: async () => {
-    const { user, selectedFuelTypeId, radius, showOnlyOpen, showOnlyUpdatedToday, selectedBrands, searchHistory } = get()
-    if (!user) return
+    const { user, selectedFuelTypeId, radius, showOnlyOpen, showOnlyUpdatedToday, selectedBrands, searchHistory, stationDiscounts } = get()
+    if (!user || isInitialLoad) return
 
-    try {
-      await supabase.from('profiles').upsert({
-        id: user.id,
-        fuel_type_id: selectedFuelTypeId,
-        search_radius: radius,
-        show_only_open: showOnlyOpen,
-        show_only_updated_today: showOnlyUpdatedToday,
-        selected_brands: selectedBrands,
-        search_history: searchHistory,
-        updated_at: new Date().toISOString()
-      })
-    } catch (error) {
-      console.error('[Store Sync] Error:', error)
-    }
+    if (syncTimeout) clearTimeout(syncTimeout)
+
+    syncTimeout = setTimeout(async () => {
+      console.log('📡 [Store Sync] Debounced sync starting...')
+      try {
+        await supabase.from('profiles').upsert({
+          id: user.id,
+          fuel_type_id: selectedFuelTypeId,
+          search_radius: radius,
+          show_only_open: showOnlyOpen,
+          show_only_updated_today: showOnlyUpdatedToday,
+          selected_brands: selectedBrands,
+          search_history: searchHistory,
+          station_discounts: Array.from(stationDiscounts.entries()),
+          updated_at: new Date().toISOString()
+        })
+        console.log('✅ [Store Sync] Success')
+      } catch (error) {
+        console.error('❌ [Store Sync] Error:', error)
+      } finally {
+        syncTimeout = null
+      }
+    }, 1000)
   },
 }))
 
 // Initialize Auth Listener
+let isInitialLoad = true
+
 supabase.auth.onAuthStateChange(async (_event, session) => {
   const store = useAppStore.getState()
   const user = session?.user || null
   store.setUser(user)
   
   if (user) {
-    // Load profile from Supabase
+    console.log('📡 [Auth] Loading user profile...')
     const { data: profile } = await supabase
       .from('profiles')
       .select('*')
@@ -579,21 +581,24 @@ supabase.auth.onAuthStateChange(async (_event, session) => {
       .single()
 
     if (profile) {
+      console.log('✅ [Auth] Profile found, restoring state')
       useAppStore.setState({
         selectedFuelTypeId: profile.fuel_type_id,
         radius: profile.search_radius,
         showOnlyOpen: profile.show_only_open,
         showOnlyUpdatedToday: profile.show_only_updated_today,
         selectedBrands: profile.selected_brands || [],
-        searchHistory: profile.search_history || []
+        searchHistory: profile.search_history || [],
+        stationDiscounts: new Map(profile.station_discounts || [])
       })
       await store.fetchUserCars()
       store.updateFilteredStations()
     } else {
-      // First time user: save current local preferences as initial profile
+      console.log('ℹ️ [Auth] New user, creating profile')
       store.syncProfile()
     }
   }
   
   useAppStore.setState({ isLoadingAuth: false })
+  isInitialLoad = false
 })
