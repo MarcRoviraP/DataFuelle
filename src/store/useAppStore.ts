@@ -543,7 +543,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     syncTimeout = setTimeout(async () => {
       console.log('📡 [Store Sync] Debounced sync starting...')
       try {
-        await supabase.from('profiles').upsert({
+        const { error } = await supabase.from('profiles').upsert({
           id: user.id,
           fuel_type_id: selectedFuelTypeId,
           search_radius: radius,
@@ -554,9 +554,14 @@ export const useAppStore = create<AppState>((set, get) => ({
           station_discounts: Array.from(stationDiscounts.entries()),
           updated_at: new Date().toISOString()
         })
-        console.log('✅ [Store Sync] Success')
+        
+        if (error) {
+          console.error('❌ [Store Sync] Supabase Error:', error.message, error.details)
+        } else {
+          console.log('✅ [Store Sync] Success')
+        }
       } catch (error) {
-        console.error('❌ [Store Sync] Error:', error)
+        console.error('❌ [Store Sync] Unexpected Error:', error)
       } finally {
         syncTimeout = null
       }
@@ -567,38 +572,64 @@ export const useAppStore = create<AppState>((set, get) => ({
 // Initialize Auth Listener
 let isInitialLoad = true
 
-supabase.auth.onAuthStateChange(async (_event, session) => {
+supabase.auth.onAuthStateChange(async (event, session) => {
   const store = useAppStore.getState()
   const user = session?.user || null
+  
+  console.log(`🔑 [Auth] Event: ${event}`, user ? `User: ${user.email}` : 'No user')
   store.setUser(user)
   
-  if (user) {
-    console.log('📡 [Auth] Loading user profile...')
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single()
+  try {
+    if (user) {
+      console.log('📡 [Auth] Fetching user profile...')
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
 
-    if (profile) {
-      console.log('✅ [Auth] Profile found, restoring state')
-      useAppStore.setState({
-        selectedFuelTypeId: profile.fuel_type_id,
-        radius: profile.search_radius,
-        showOnlyOpen: profile.show_only_open,
-        showOnlyUpdatedToday: profile.show_only_updated_today,
-        selectedBrands: profile.selected_brands || [],
-        searchHistory: profile.search_history || [],
-        stationDiscounts: new Map(profile.station_discounts || [])
-      })
-      await store.fetchUserCars()
-      store.updateFilteredStations()
-    } else {
-      console.log('ℹ️ [Auth] New user, creating profile')
-      store.syncProfile()
+      if (error && error.code !== 'PGRST116') {
+        console.warn('⚠️ [Auth] Profile fetch warning:', error.message)
+      }
+
+      if (profile) {
+        console.log('✅ [Auth] Profile found, restoring state')
+        const oldRadius = useAppStore.getState().radius
+        const oldFuel = useAppStore.getState().selectedFuelTypeId
+
+        useAppStore.setState({
+          selectedFuelTypeId: profile.fuel_type_id,
+          radius: profile.search_radius,
+          showOnlyOpen: profile.show_only_open,
+          showOnlyUpdatedToday: profile.show_only_updated_today,
+          selectedBrands: profile.selected_brands || [],
+          searchHistory: profile.search_history || [],
+          stationDiscounts: new Map(profile.station_discounts || [])
+        })
+
+        console.log('🏎️ [Auth] Loading garage...')
+        await store.fetchUserCars()
+        
+        // If profile settings change the scope of the current data, re-fetch
+        if (profile.search_radius > oldRadius || profile.fuel_type_id !== oldFuel) {
+          console.log('🔄 [Auth] Filters changed, re-fetching stations...')
+          await store.fetchStations()
+        } else {
+          store.updateFilteredStations()
+        }
+      } else {
+        console.log('ℹ️ [Auth] No profile yet, sync current defaults')
+        // Only sync if we're not in initial load or if explicitly needed
+        if (!isInitialLoad) {
+          store.syncProfile()
+        }
+      }
     }
+  } catch (err) {
+    console.error('❌ [Auth] Critical Error in Listener:', err)
+  } finally {
+    useAppStore.setState({ isLoadingAuth: false })
+    isInitialLoad = false
+    console.log('🏁 [Auth] Initial load sequence complete')
   }
-  
-  useAppStore.setState({ isLoadingAuth: false })
-  isInitialLoad = false
 })

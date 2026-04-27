@@ -294,7 +294,7 @@ export const StationCard = memo(({ station, isSelected, onClick }: StationCardPr
       <div className="flex gap-2 mb-3 flex-wrap">
         {fuelTypes.map(({ key, label }) => {
           const raw = station[key]
-          if (!raw || raw <= 0) return null
+          if (!raw || raw < 0.1) return null
           const final = currentDiscount > 0 ? raw - currentDiscount : null
           return (
             <div key={key} className="flex flex-col items-center bg-slate-50 border border-slate-100 rounded-lg px-2 py-1 min-w-[52px]">

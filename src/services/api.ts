@@ -83,15 +83,25 @@ export const fetchStationsByRadius = async (
     rawStations = mitecoCache.data
   } else {
     console.log('[MITECO] Fetching fresh data from Ministry...')
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000)
+
     try {
-      const response = await fetch(MITECO_URL)
+      const response = await fetch(MITECO_URL, { signal: controller.signal })
+      clearTimeout(timeoutId)
+      
       if (!response.ok) throw new Error(`MITECO API Error: ${response.status}`)
       const json = await response.json()
       rawStations = json.ListaEESSPrecio || []
       mitecoCache = { data: rawStations, timestamp: now }
       console.log(`[MITECO] Loaded ${rawStations.length} stations`)
-    } catch (err) {
-      console.error('[MITECO Fetch Error]', err)
+    } catch (err: any) {
+      clearTimeout(timeoutId)
+      if (err.name === 'AbortError') {
+        console.error('[MITECO] Fetch timeout after 10s')
+      } else {
+        console.error('[MITECO Fetch Error]', err)
+      }
       return []
     }
   }
@@ -130,7 +140,7 @@ export const fetchStationsByRadius = async (
         lastUpdate: new Date().toISOString()
       }
     })
-    .filter(s => s.distancia <= radio && s.precioCombustible > 0)
+    .filter(s => s.distancia <= radio && s.precioCombustible >= 0.1)
     .sort((a, b) => a.distancia - b.distancia)
 }
 
