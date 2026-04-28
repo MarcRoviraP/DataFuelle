@@ -47,8 +47,8 @@ async function initDuckDB() {
   }
 }
 
-export const fetchHistoryFromParquet = async (idEstacion: number): Promise<any[]> => {
-  console.log(`[HistoricalData] Iniciando búsqueda para estación ${idEstacion}...`);
+export const fetchHistoryFromParquet = async (idEstacion: number, retries = 1): Promise<any[]> => {
+  console.log(`[HistoricalData] Iniciando búsqueda para estación ${idEstacion}... (Intento: ${2-retries})`);
   try {
     const instance = await initDuckDB();
     console.log('[HistoricalData] Conectando a DuckDB...');
@@ -56,12 +56,29 @@ export const fetchHistoryFromParquet = async (idEstacion: number): Promise<any[]
 
     // 1. Listar archivos en el bucket
     console.time('[HistoricalData] Storage List');
+    
+    // Ensure session is stable before storage call to avoid lock competition
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      console.warn('[HistoricalData] No active session found, attempting listing as guest/anon');
+    }
+
     const { data: files, error } = await supabase.storage.from('historical-data').list();
     console.timeEnd('[HistoricalData] Storage List');
     console.log('[HistoricalData] Archivos en bucket:', files);
     
-    if (error || !files || files.length === 0) {
-      console.warn('[HistoricalData] No se encontraron archivos o hubo error:', error);
+    if (error) {
+      if ((error.message?.includes('Lock') || error.message?.includes('stole it')) && retries > 0) {
+        console.warn('[HistoricalData] Auth lock issue detected, retrying list in 500ms...');
+        await new Promise(resolve => setTimeout(resolve, 500));
+        return fetchHistoryFromParquet(idEstacion, retries - 1);
+      }
+      console.warn('[HistoricalData] Error listing storage files:', error);
+      return [];
+    }
+
+    if (!files || files.length === 0) {
+      console.warn('[HistoricalData] No se encontraron archivos en el bucket.');
       return [];
     }
 

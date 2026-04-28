@@ -1,4 +1,4 @@
-import { supabaseFetch } from './supabaseClient'
+import { supabase } from './supabaseClient'
 import { fetchHistoryFromParquet } from './historicalData'
 
 export interface FuelType {
@@ -157,16 +157,25 @@ export const fetchStationHistory = async (idEstacion: number, days: number | nul
 
   // 1. Preparar queries en paralelo
   const fetchDbData = async () => {
-    let dbQuery = `price_history?station_id=eq.${idEstacion}&order=recorded_at.asc`
-    if (days !== null) {
-      const since = new Date()
-      since.setDate(since.getDate() - days)
-      dbQuery += `&recorded_at=gte.${since.toISOString()}`
-    }
-
     try {
-      const rawDbData = await supabaseFetch(dbQuery)
-      console.log(`[API] Se obtuvieron ${rawDbData.length} registros de la DB`)
+      // Use the client directly instead of manual fetch to benefit from internal session management
+      let query = supabase
+        .from('price_history')
+        .select('*')
+        .eq('station_id', idEstacion)
+        .order('recorded_at', { ascending: true });
+
+      if (days !== null) {
+        const since = new Date();
+        since.setDate(since.getDate() - days);
+        query = query.gte('recorded_at', since.toISOString());
+      }
+
+      const { data: rawDbData, error } = await query;
+
+      if (error) throw error;
+
+      console.log(`[API] Se obtuvieron ${rawDbData?.length || 0} registros de la DB`);
       
       const cleanPrice = (val: any) => {
         if (val === null || val === undefined) return null;
@@ -174,7 +183,7 @@ export const fetchStationHistory = async (idEstacion: number, days: number | nul
         return (!isNaN(n) && n >= 0.1) ? n : null;
       };
 
-      return rawDbData
+      return (rawDbData || [])
         .map((d: any) => ({
           ...d,
           price_95: cleanPrice(d.price_95),
@@ -184,12 +193,12 @@ export const fetchStationHistory = async (idEstacion: number, days: number | nul
         .filter((d: any) => {
           if (isNaN(new Date(d.recorded_at).getTime())) return false;
           return d.price_95 !== null || d.price_98 !== null || d.price_diesel !== null;
-        })
+        });
     } catch (error) {
-      console.error('[DB History Error]', error)
-      return []
+      console.error('[DB History Error]', error);
+      return [];
     }
-  }
+  };
 
   const fetchParquetData = async () => {
     try {

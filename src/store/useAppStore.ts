@@ -571,16 +571,25 @@ export const useAppStore = create<AppState>((set, get) => ({
 
 // Initialize Auth Listener
 let isInitialLoad = true
+let isSyncingProfile = false
 
 supabase.auth.onAuthStateChange(async (event, session) => {
   const store = useAppStore.getState()
   const user = session?.user || null
   
   console.log(`🔑 [Auth] Event: ${event}`, user ? `User: ${user.email}` : 'No user')
-  store.setUser(user)
   
+  // Always update user state immediately
+  if (store.user?.id !== user?.id) {
+    store.setUser(user)
+  }
+  
+  // Avoid redundant work if the event is just a token refresh without user change
+  if (event === 'TOKEN_REFRESHED') return
+
   try {
-    if (user) {
+    if (user && !isSyncingProfile) {
+      isSyncingProfile = true
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 8000)
 
@@ -614,14 +623,10 @@ supabase.auth.onAuthStateChange(async (event, session) => {
           })
 
           console.log('🏎️ [Auth] Loading garage...')
-          const garageController = new AbortController()
-          const garageTimeout = setTimeout(() => garageController.abort(), 5000)
           try {
             await store.fetchUserCars()
-            clearTimeout(garageTimeout)
           } catch (e) {
-            clearTimeout(garageTimeout)
-            console.warn('⚠️ [Auth] Garage fetch timed out or failed')
+            console.warn('⚠️ [Auth] Garage fetch failed')
           }
           
           if (profile.search_radius > oldRadius || profile.fuel_type_id !== oldFuel) {
@@ -641,12 +646,15 @@ supabase.auth.onAuthStateChange(async (event, session) => {
         if (err.name === 'AbortError') {
           console.error('❌ [Auth] Profile fetch timed out after 8s')
         } else {
-          console.error('❌ [Auth] Critical Error in Listener:', err)
+          console.error('❌ [Auth] Error in Auth sequence:', err)
         }
+      } finally {
+        isSyncingProfile = false
       }
     }
   } catch (err: any) {
     console.error('❌ [Auth] Top-level error in Listener:', err)
+    isSyncingProfile = false
   } finally {
     store.setIsLoading(false)
     useAppStore.setState({ isLoadingAuth: false })
