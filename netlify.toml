@@ -6,10 +6,10 @@
   directory = "netlify/functions"
   node_bundler = "esbuild"
 
-# sync-miteco-cron runs as a background function (up to 15 min) on a schedule.
-# It fetches MITECO data and writes directly to Supabase via service role key.
-# Required env vars in Netlify dashboard:
-#   SUPABASE_URL         → your Supabase project URL
-#   SUPABASE_SERVICE_ROLE_KEY → service role key (NOT the anon key)
-[functions."sync-miteco-cron"]
+# Background functions return 202 immediately and can run up to 15 minutes.
+# Naming convention: must end in "-background" for Netlify to treat it as background.
+# Required env vars in Netlify dashboard (Site config → Environment variables):
+#   SUPABASE_URL               → https://msetjsrlioiysxmgybdg.supabase.co
+#   SUPABASE_SERVICE_ROLE_KEY  → service role key from Supabase → Settings → API
+[functions."sync-miteco-cron-background"]
   schedule = "0 0,12 * * *"
