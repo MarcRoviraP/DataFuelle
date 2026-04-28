@@ -202,7 +202,8 @@ export const fetchStationHistory = async (idEstacion: number, days: number | nul
 
   const fetchParquetData = async () => {
     try {
-      if (days === null || days > 7) {
+      // Siempre buscamos en Parquet si se piden 7 días o más, o si es el historial completo
+      if (days === null || days >= 7) {
         console.log('[API] Buscando histórico en Parquet vía DuckDB para estación:', idEstacion)
         let historicalData = await fetchHistoryFromParquet(idEstacion)
         console.log(`[API] Se obtuvieron ${historicalData.length} registros del historial Parquet`)

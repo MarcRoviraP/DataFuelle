@@ -15,7 +15,7 @@ if (!SUPABASE_SERVICE_ROLE_KEY) {
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 async function uploadFiles() {
-    const dataDir = 'data';
+    const dataDir = 'data/year';
     const files = fs.readdirSync(dataDir).filter(f => f.endsWith('.parquet')).sort();
 
     console.log(`🚀 Iniciando subida de ${files.length} archivos al bucket "${BUCKET_NAME}"...`);
