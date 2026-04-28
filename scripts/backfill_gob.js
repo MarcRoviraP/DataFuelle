@@ -8,13 +8,13 @@ import fs from 'fs';
  */
 
 const API_BASE = 'https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestresHist/';
-const START_DATE = new Date('2007-01-01');
-const END_DATE = new Date('2025-09-01'); // today
-const OUTPUT_FILE = 'gob_backfill_history.sql';
+const START_DATE = new Date('2026-04-16');
+const END_DATE = new Date('2026-04-28'); // today
+const OUTPUT_FILE = 'sql/gob_backfill_history.sql';
 
 // We'll fetch the IDs from the DB and pass them to the script or read from a file.
 // For now, I'll assume we have a 'valid_ids.json' file with [id1, id2, ...]
-const VALID_IDS_FILE = 'valid_ids.json';
+const VALID_IDS_FILE = 'data/valid_ids.json';
 
 async function fetchWithRetry(url, retries = 3) {
   for (let i = 0; i < retries; i++) {
