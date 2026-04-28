@@ -584,14 +584,25 @@ supabase.auth.onAuthStateChange(async (event, session) => {
     store.setUser(user)
   }
   
-  // Avoid redundant work if the event is just a token refresh without user change
+  // Avoid redundant work for certain events
   if (event === 'TOKEN_REFRESHED') return
+  if (!user) {
+    if (event === 'SIGNED_OUT') {
+      console.log('👋 [Auth] User signed out')
+      useAppStore.setState({ isLoadingAuth: false })
+    }
+    return
+  }
 
-  try {
-    if (user && !isSyncingProfile) {
-      isSyncingProfile = true
+  // Use a small timeout to avoid race conditions with multiple rapid events
+  // or parallel requests at startup.
+  setTimeout(async () => {
+    if (isSyncingProfile) return
+    isSyncingProfile = true
+
+    try {
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 8000)
+      const timeoutId = setTimeout(() => controller.abort(), 10000)
 
       try {
         console.log('📡 [Auth] Fetching user profile...')
@@ -636,29 +647,26 @@ supabase.auth.onAuthStateChange(async (event, session) => {
             store.updateFilteredStations()
           }
         } else {
-          console.log('ℹ️ [Auth] No profile yet, sync current defaults')
+          console.log('ℹ [Auth] No profile yet, sync current defaults')
           if (!isInitialLoad) {
             store.syncProfile()
           }
         }
       } catch (err: any) {
         clearTimeout(timeoutId)
-        if (err.name === 'AbortError') {
-          console.error('❌ [Auth] Profile fetch timed out after 8s')
-        } else {
-          console.error('❌ [Auth] Error in Auth sequence:', err)
-        }
+        console.error('❌ [Auth] Error in Auth sequence:', err.message || err)
       } finally {
         isSyncingProfile = false
+        store.setIsLoading(false)
+        useAppStore.setState({ isLoadingAuth: false })
+        if (isInitialLoad) {
+          isInitialLoad = false
+          console.log('🏁 [Auth] Initial load sequence complete')
+        }
       }
+    } catch (err: any) {
+      console.error('❌ [Auth] Top-level error in Listener:', err)
+      isSyncingProfile = false
     }
-  } catch (err: any) {
-    console.error('❌ [Auth] Top-level error in Listener:', err)
-    isSyncingProfile = false
-  } finally {
-    store.setIsLoading(false)
-    useAppStore.setState({ isLoadingAuth: false })
-    isInitialLoad = false
-    console.log('🏁 [Auth] Initial load sequence complete')
-  }
+  }, isInitialLoad ? 100 : 0)
 })

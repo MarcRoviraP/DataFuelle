@@ -8,8 +8,10 @@ export const supabase = createClient(SUPABASE_URL, ANON_KEY, {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    // Note: If lock issues persist, we can consider setting lockType: 'null' 
-    // but first we try to fix the calling patterns.
+    // Disable the browser lock manager to avoid "Lock was released because another request stole it"
+    // which is common in Chromium browsers when multiple parallel requests occur during refresh.
+    // lockType is a runtime option not yet exposed in the TS types of this version.
+    ...(({ lockType: 'null' } as any))
   }
 });
 
