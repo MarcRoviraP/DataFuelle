@@ -4,8 +4,12 @@
 
 [functions]
   directory = "netlify/functions"
+  node_bundler = "esbuild"
 
-# Programamos el disparador (trigger) para las 00:00 y 12:00 (UTC)
+# sync-miteco-cron runs as a background function (up to 15 min) on a schedule.
+# It fetches MITECO data and writes directly to Supabase via service role key.
+# Required env vars in Netlify dashboard:
+#   SUPABASE_URL         → your Supabase project URL
+#   SUPABASE_SERVICE_ROLE_KEY → service role key (NOT the anon key)
 [functions."sync-miteco-cron"]
   schedule = "0 0,12 * * *"
- 
