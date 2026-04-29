@@ -119,15 +119,6 @@ function App() {
             <span className="text-[10px] font-bold uppercase tracking-widest">Lista</span>
           </button>
 
-          <button 
-            onClick={() => setIsSidebarOpen(true)}
-            className={`flex flex-col items-center gap-1.5 px-6 py-2 rounded-2xl transition-all ${
-              isSidebarOpen ? 'text-blue-600 bg-blue-50' : 'text-slate-400'
-            }`}
-          >
-            <Settings size={20} />
-            <span className="text-[10px] font-bold uppercase tracking-widest">Filtros</span>
-          </button>
         </nav>
       </main>
     </div>
