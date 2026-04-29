@@ -3,7 +3,7 @@ import { Sidebar } from './components/Sidebar'
 import { StationList } from './components/StationList'
 import { MapView } from './components/MapView'
 import { useAppStore } from './store/useAppStore'
-import { X, Map as MapIcon, List, Settings } from 'lucide-react'
+import { X, Map as MapIcon, List } from 'lucide-react'
 import { Menu } from 'lucide-react'
 import { AuthScreen } from './components/AuthScreen'
 

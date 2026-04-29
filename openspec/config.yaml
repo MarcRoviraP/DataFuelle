@@ -1,0 +1,35 @@
+# openspec/config.yaml
+schema: spec-driven
+
+context: |
+  Tech stack: React 19, Vite, TypeScript, TailwindCSS 4
+  Architecture: Component-based, Zustand store, Supabase backend
+  Testing: Not found
+  Style: ESLint
+
+strict_tdd: false
+
+testing:
+  runner: "-"
+  layers:
+    unit: false
+    integration: false
+    e2e: false
+  quality:
+    linter: "npm run lint"
+    typecheck: "npm run build"
+
+rules:
+  proposal:
+    - Identify affected modules/packages
+  specs:
+    - Use Given/When/Then format for scenarios
+  design:
+    - Document architecture decisions with rationale
+  tasks:
+    - Group tasks by phase
+    - Use hierarchical numbering
+  apply:
+    - Follow existing code patterns and conventions
+  verify:
+    - Compare implementation against every spec scenario

@@ -1,5 +1,5 @@
 import * as duckdb from '@duckdb/duckdb-wasm';
-import { supabase } from './supabaseClient';
+import { SUPABASE_URL } from './supabaseClient';
 
 let db: duckdb.AsyncDuckDB | null = null;
 
@@ -47,64 +47,51 @@ async function initDuckDB() {
   }
 }
 
-export const fetchHistoryFromParquet = async (idEstacion: number, retries = 1): Promise<any[]> => {
-  console.log(`[HistoricalData] Iniciando búsqueda para estación ${idEstacion}... (Intento: ${2-retries})`);
+/**
+ * Determina qué años calendarios son necesarios para cubrir un rango de días.
+ */
+const getYearsForRange = (days: number | null): number[] => {
+  const currentYear = new Date().getFullYear();
+  if (days === null) {
+    // Si no hay límite, devolvemos desde el inicio del histórico (2007) hasta hoy
+    const years: number[] = [];
+    for (let y = 2007; y <= currentYear; y++) years.push(y);
+    return years;
+  }
+  
+  const startYear = new Date(Date.now() - days * 24 * 60 * 60 * 1000).getFullYear();
+  const years: number[] = [];
+  for (let y = startYear; y <= currentYear; y++) years.push(y);
+  return years;
+};
+
+/**
+ * Construye las URLs públicas de Supabase Storage de forma determinista.
+ */
+const buildParquetUrls = (years: number[]): string[] => {
+  return years.map(year => `${SUPABASE_URL}/storage/v1/object/public/historical-data/fuel_prices_${year}.parquet`);
+};
+
+export const fetchHistoryFromParquet = async (idEstacion: number, days: number | null = null): Promise<any[]> => {
+  console.log(`[HistoricalData] Iniciando búsqueda predictiva para estación ${idEstacion}... (Días: ${days ?? 'Todos'})`);
+  
   try {
     const instance = await initDuckDB();
-    console.log('[HistoricalData] Conectando a DuckDB...');
     const conn = await instance.connect();
 
-    // 1. Listar archivos en el bucket
-    console.time('[HistoricalData] Storage List');
+    // 1. Determinar años y construir URLs
+    const years = getYearsForRange(days);
+    const parquetFiles = buildParquetUrls(years);
     
-    // Ensure session is stable before storage call to avoid lock competition
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      console.warn('[HistoricalData] No active session found, attempting listing as guest/anon');
-    }
-
-    const { data: files, error } = await supabase.storage.from('historical-data').list();
-    console.timeEnd('[HistoricalData] Storage List');
-    console.log('[HistoricalData] Archivos en bucket:', files);
-    
-    if (error) {
-      if ((error.message?.includes('Lock') || error.message?.includes('stole it')) && retries > 0) {
-        console.warn('[HistoricalData] Auth lock issue detected, retrying list in 500ms...');
-        await new Promise(resolve => setTimeout(resolve, 500));
-        return fetchHistoryFromParquet(idEstacion, retries - 1);
-      }
-      console.warn('[HistoricalData] Error listing storage files:', error);
-      return [];
-    }
-
-    if (!files || files.length === 0) {
-      console.warn('[HistoricalData] No se encontraron archivos en el bucket.');
-      return [];
-    }
-
-    // 2. Obtener las URLs de los parquets
-    const parquetFiles = files
-      .filter(f => f.name.endsWith('.parquet'))
-      .map(f => {
-        const { data } = supabase.storage.from('historical-data').getPublicUrl(f.name);
-        return data.publicUrl;
-      });
-
+    console.log('[HistoricalData] Años seleccionados:', years);
     console.log('[HistoricalData] URLs de Parquets a consultar:', parquetFiles);
 
     if (parquetFiles.length === 0) return [];
 
-    // 3. Registrar los archivos en DuckDB y consultar
-    // Usamos read_parquet con la lista de URLs
-    console.log('[HistoricalData] Ejecutando query en DuckDB...');
-    
-    // Lista de URLs para la consulta
+    // 2. Ejecutar query en DuckDB
+    // Usamos read_parquet con la lista de URLs construidas
     const urls = parquetFiles.map(url => `'${url}'`).join(',');
-
-    // Log para ver el total de filas en los parquets sin filtrar por estación
-    const countResult = await conn.query(`SELECT count(*) as total FROM read_parquet([${urls}])`);
-    console.log('[HistoricalData] Total de filas en Parquets (todos):', countResult.toArray()[0].toJSON().total);
-
+    
     const query = `
       SELECT 
         station_id,
@@ -117,25 +104,16 @@ export const fetchHistoryFromParquet = async (idEstacion: number, retries = 1): 
       ORDER BY recorded_at ASC
     `;
 
+    console.log('[HistoricalData] Ejecutando query en DuckDB...');
     const result = await conn.query(query);
     console.log('[HistoricalData] Query finalizada.');
 
     const rawRows = result.toArray();
-    if (rawRows.length > 0) {
-      console.log('[HistoricalData] Muestra de la primera fila:', rawRows[0].toJSON());
-    } else {
-      console.warn('[HistoricalData] La query no devolvió nada para la estación:', idEstacion);
-      
-      // DIAGNÓSTICO: Ver qué IDs existen en el Parquet realmente
-      const diag = await conn.query(`SELECT DISTINCT station_id FROM read_parquet([${urls}]) LIMIT 10`);
-      console.log('[HistoricalData] IDs de estaciones disponibles en el Parquet (muestra):', diag.toArray().map(r => r.toJSON().station_id));
-    }
-
+    
     const rows = rawRows
       .map(row => {
         const obj = row.toJSON();
         
-        // Normalizar la fecha: DuckDB puede devolver número (ms), Date o String
         let dateStr: string;
         if (obj.recorded_at instanceof Date) {
           dateStr = obj.recorded_at.toISOString();
@@ -145,33 +123,26 @@ export const fetchHistoryFromParquet = async (idEstacion: number, retries = 1): 
           dateStr = String(obj.recorded_at);
         }
 
-        // Limpieza: Si el precio es 0, NaN o null, lo ponemos como null para que la gráfica no pegue el bajón
         const cleanPrice = (val: any) => {
           if (val === null || val === undefined) return null;
           const n = Number(val);
           return (!isNaN(n) && n >= 0.1) ? n : null;
         };
 
-        const p95 = cleanPrice(obj.price_95);
-        const p98 = cleanPrice(obj.price_98);
-        const pdie = cleanPrice(obj.price_diesel);
-
         return {
           station_id: Number(obj.station_id),
           recorded_at: dateStr,
-          price_95: p95,
-          price_98: p98,
-          price_diesel: pdie
+          price_95: cleanPrice(obj.price_95),
+          price_98: cleanPrice(obj.price_98),
+          price_diesel: cleanPrice(obj.price_diesel)
         };
       })
       .filter(row => {
-        // Purga de registros con fecha inválida (NaN en el timestamp)
         if (isNaN(new Date(row.recorded_at).getTime())) return false;
-        // Y que al menos tenga un precio válido
         return row.price_95 !== null || row.price_98 !== null || row.price_diesel !== null;
       });
 
-    console.log(`[HistoricalData] Proceso finalizado. ${rows.length} filas obtenidas (limpias).`);
+    console.log(`[HistoricalData] Proceso finalizado. ${rows.length} filas obtenidas.`);
     await conn.close();
     return rows;
   } catch (err) {
