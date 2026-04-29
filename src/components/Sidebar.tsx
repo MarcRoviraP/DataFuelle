@@ -185,14 +185,6 @@ export const Sidebar = () => {
               </div>
             )}
 
-            {/* Mobile Close Button */}
-            <button
-              onClick={() => setIsSidebarOpen(false)}
-              className="lg:hidden p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-all"
-              title="Cerrar panel"
-            >
-              <X size={20} />
-            </button>
           </div>
         </div>
 
