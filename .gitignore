@@ -48,3 +48,9 @@ supabase/config.toml
 .env*
 .venv
 *.parquet
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example
