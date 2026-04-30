@@ -77,3 +77,92 @@
 .leaflet-bottom.leaflet-right .leaflet-control-zoom {
   margin-bottom: 90px !important;
 }
+
+/* --- CUSTOM LAYER VIEW (Glassmorphism) --- */
+.leaflet-control-layers {
+  background: rgba(15, 23, 42, 0.8) !important; /* Slate-900 with transparency */
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+  color: white !important;
+  font-family: inherit !important;
+  padding: 4px !important;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.leaflet-control-layers-toggle {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M6.429 9.75L2.25 12l4.179 2.25m0-4.5l5.571 3 5.571-3m-11.142 0L2.25 7.5 12 2.25l9.75 5.25-4.179 2.25m0 0L21.75 12l-4.179 2.25m0 0l-5.571 3-5.571-3m11.142 0l4.179 2.25L12 21.75 2.25 16.5l4.179-2.25m11.142 0l-5.571 3-5.571-3' /%3E%3C/svg%3E") !important;
+  background-size: 26px !important;
+  width: 44px !important;
+  height: 44px !important;
+}
+
+/* --- CUSTOM ZOOM CONTROL --- */
+.leaflet-control-zoom {
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+}
+
+.leaflet-control-zoom-in,
+.leaflet-control-zoom-out {
+  background: rgba(15, 23, 42, 0.8) !important;
+  backdrop-filter: blur(12px);
+  color: white !important;
+  border: none !important;
+  width: 40px !important;
+  height: 40px !important;
+  line-height: 40px !important;
+  font-size: 18px !important;
+  transition: background 0.2s !important;
+}
+
+.leaflet-control-zoom-in:hover,
+.leaflet-control-zoom-out:hover {
+  background: rgba(30, 41, 59, 0.9) !important;
+  color: #3b82f6 !important;
+}
+
+.leaflet-control-zoom-in {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.leaflet-control-layers-expanded {
+  padding: 12px 16px !important;
+  background: rgba(15, 23, 42, 0.95) !important;
+}
+
+.leaflet-control-layers-list {
+  margin: 0 !important;
+}
+
+.leaflet-control-layers-base label {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px;
+  padding: 8px 0 !important;
+  cursor: pointer;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  transition: color 0.2s;
+}
+
+.leaflet-control-layers-base label:hover {
+  color: #3b82f6; /* Blue-500 */
+}
+
+.leaflet-control-layers-base input[type="radio"] {
+  accent-color: #3b82f6;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* Custom separator */
+.leaflet-control-layers-separator {
+  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+  margin: 8px -16px !important;
+}
