@@ -40,6 +40,7 @@ let mitecoCache: {
 } | null = null
 
 const CACHE_DURATION = 30 * 60 * 1000 // 30 minutes
+let pendingMitecoFetch: Promise<any[]> | null = null
 
 const parseMitecoNumber = (val: string): number => {
   if (!val) return 0
@@ -81,29 +82,36 @@ export const fetchStationsByRadius = async (
   if (mitecoCache && (now - mitecoCache.timestamp) < CACHE_DURATION) {
     console.log('[MITECO] Using cached data')
     rawStations = mitecoCache.data
+  } else if (pendingMitecoFetch) {
+    console.log('[MITECO] Waiting for existing fetch to complete...')
+    rawStations = await pendingMitecoFetch
   } else {
     console.log('[MITECO] Fetching fresh data from Ministry...')
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 10000)
+    
+    pendingMitecoFetch = (async () => {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000)
 
-    try {
-      const response = await fetch(MITECO_URL, { signal: controller.signal })
-      clearTimeout(timeoutId)
-      
-      if (!response.ok) throw new Error(`MITECO API Error: ${response.status}`)
-      const json = await response.json()
-      rawStations = json.ListaEESSPrecio || []
-      mitecoCache = { data: rawStations, timestamp: now }
-      console.log(`[MITECO] Loaded ${rawStations.length} stations`)
-    } catch (err: any) {
-      clearTimeout(timeoutId)
-      if (err.name === 'AbortError') {
-        console.error('[MITECO] Fetch timeout after 10s')
-      } else {
+      try {
+        const response = await fetch(MITECO_URL, { signal: controller.signal })
+        clearTimeout(timeoutId)
+        
+        if (!response.ok) throw new Error(`MITECO API Error: ${response.status}`)
+        const json = await response.json()
+        const data = json.ListaEESSPrecio || []
+        mitecoCache = { data, timestamp: Date.now() }
+        console.log(`[MITECO] Loaded ${data.length} stations`)
+        return data
+      } catch (err: any) {
+        clearTimeout(timeoutId)
         console.error('[MITECO Fetch Error]', err)
+        return []
+      } finally {
+        pendingMitecoFetch = null
       }
-      return []
-    }
+    })()
+
+    rawStations = await pendingMitecoFetch
   }
 
   // Map MITECO fields to our Station interface

@@ -23,22 +23,25 @@ function App() {
   useEffect(() => {
     const store = useAppStore.getState()
     
-    // 1. Immediate fetch with initial/default location
-    store.fetchStations()
+    // 1. Initial fetch (using default or restored location)
+    // Only if we don't have stations yet
+    if (store.stations.length === 0) {
+      store.fetchStations()
+    }
 
-    // 2. Geolocation in background — non-blocking
+    // 2. Try to get real location
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords
           setCurrentLocation(latitude, longitude)
-          // Re-fetch only if user location is actually changed
+          // Re-fetch only once with the real user location
           store.fetchStations()
         },
         (error) => {
           console.warn('Geolocation unavailable, using default center.', error)
         },
-        { timeout: 5000 } // Reduced timeout for better responsiveness
+        { timeout: 5000 }
       )
     }
   }, [setCurrentLocation])
