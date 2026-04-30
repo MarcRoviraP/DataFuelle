@@ -5,7 +5,7 @@ import { StationCard } from './StationCard'
 import { LoadingSkeleton } from './LoadingSkeleton'
 
 export const StationList = () => {
-  const { filteredStations, isLoading, selectedStationId, setSelectedStationId, setViewMode } = useAppStore()
+  const { filteredStations, isLoading, selectedStationId, setSelectedStationId, setViewMode, viewMode } = useAppStore()
   const virtuosoRef = useRef<VirtuosoHandle>(null)
 
   // Auto-scroll to selected station when it changes (e.g. from map click)
@@ -13,14 +13,18 @@ export const StationList = () => {
     if (selectedStationId && filteredStations.length > 0) {
       const index = filteredStations.findIndex(s => s.idEstacion === selectedStationId)
       if (index !== -1) {
-        virtuosoRef.current?.scrollToIndex({
-          index,
-          align: 'center',
-          behavior: 'smooth'
-        })
+        // Small delay to ensure Virtuoso has layout if it was hidden
+        const timer = setTimeout(() => {
+          virtuosoRef.current?.scrollToIndex({
+            index,
+            align: 'center',
+            behavior: 'smooth'
+          })
+        }, 100)
+        return () => clearTimeout(timer)
       }
     }
-  }, [selectedStationId, filteredStations])
+  }, [selectedStationId, filteredStations, viewMode])
 
   if (isLoading && filteredStations.length === 0) {
     return <LoadingSkeleton />
