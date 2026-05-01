@@ -4,6 +4,7 @@ import { MapPin, Clock, Navigation, Tag, Calendar, TrendingUp, ChevronDown, Chev
 import { shouldShowLastUpdate, formatLastUpdate } from '../utils/date'
 import { formatDistance } from '../utils/geo'
 import { useAppStore } from '../store/useAppStore'
+import { LightweightChart } from './LightweightChart'
 
 interface StationCardProps {
   station: Station
@@ -24,168 +25,7 @@ const PERIOD_TABS: { label: string; days: number | null }[] = [
   { label: 'Todo', days: null },
 ]
 
-// SVG line chart — pure, no deps
-function LineChart({ data: rawData, fuelKey }: { data: any[]; fuelKey: string }) {
-  const W = 260
-  const H = 80
-  const PAD = { top: 8, right: 6, bottom: 20, left: 32 }
-
-  // Filter data to only include valid prices for THIS fuel type
-  const data = rawData.filter(d => d[fuelKey] !== null && d[fuelKey] !== undefined && Number(d[fuelKey]) >= 0.1)
-  const prices = data.map(d => Number(d[fuelKey]))
-
-  if (prices.length < 2) return (
-    <div className="h-20 flex items-center justify-center text-[10px] text-slate-400">
-      Insuficientes datos para graficar {fuelKey.replace('price_', '').toUpperCase()}
-    </div>
-  )
-
-  const minP = Math.min(...prices)
-  const maxP = Math.max(...prices)
-  const rangeP = maxP - minP || 0.01
-
-  const innerW = W - PAD.left - PAD.right
-  const innerH = H - PAD.top - PAD.bottom
-
-  const xs = data.map((_, i) => PAD.left + (i / (data.length - 1)) * innerW)
-  const ys = data.map(d => PAD.top + innerH - (Number(d[fuelKey]) - minP) / rangeP * innerH)
-
-  const polyline = xs.map((x, i) => `${x},${ys[i]}`).join(' ')
-
-  // Gradient fill path
-  const fillPath = `M${xs[0]},${ys[0]} ` +
-    xs.slice(1).map((x, i) => `L${x},${ys[i + 1]}`).join(' ') +
-    ` L${xs[xs.length - 1]},${PAD.top + innerH} L${xs[0]},${PAD.top + innerH} Z`
-
-  // Y axis labels
-  const yLabels = [minP, (minP + maxP) / 2, maxP]
-
-  // X axis: show first, middle and last date
-  const firstDate = new Date(data[0].recorded_at)
-  const lastDate = new Date(data[data.length - 1].recorded_at)
-  const spansMultipleYears = firstDate.getFullYear() !== lastDate.getFullYear()
-
-  const xDates = [0, Math.floor((data.length - 1) / 2), data.length - 1]
-    .filter((i, pos, arr) => arr.indexOf(i) === pos)
-    .map(i => {
-      const d = new Date(data[i].recorded_at)
-      const options: Intl.DateTimeFormatOptions = { 
-        day: '2-digit', 
-        month: 'short',
-        ...(spansMultipleYears ? { year: '2-digit' } : {})
-      }
-      return { x: xs[i], label: d.toLocaleDateString('es-ES', options) }
-    })
-
-  // Hover state
-  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
-
-  return (
-    <div className="relative select-none">
-      <svg
-        width="100%"
-        viewBox={`0 0 ${W} ${H}`}
-        className="overflow-visible"
-        onMouseLeave={() => setHoveredIdx(null)}
-      >
-        <defs>
-          <linearGradient id={`lg-${fuelKey}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.25" />
-            <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.02" />
-          </linearGradient>
-        </defs>
-
-        {/* Fill area */}
-        <path d={fillPath} fill={`url(#lg-${fuelKey})`} />
-
-        {/* Horizontal grid */}
-        {yLabels.map((_, i) => {
-          const gy = PAD.top + (innerH / (yLabels.length - 1)) * (yLabels.length - 1 - i)
-          return <line key={i} x1={PAD.left} y1={gy} x2={PAD.left + innerW} y2={gy} stroke="#e2e8f0" strokeWidth="0.5" />
-        })}
-
-        {/* Y axis labels */}
-        {yLabels.map((val, i) => {
-          const gy = PAD.top + (innerH / (yLabels.length - 1)) * (yLabels.length - 1 - i)
-          return (
-            <text key={i} x={PAD.left - 3} y={gy + 3} textAnchor="end" fontSize="7" fill="#94a3b8" fontFamily="sans-serif">
-              {val.toFixed(3)}
-            </text>
-          )
-        })}
-
-        {/* Line */}
-        <polyline points={polyline} fill="none" stroke="#3b82f6" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
-
-        {/* X axis dates */}
-        {xDates.map(({ x, label }) => (
-          <text key={label} x={x} y={H - 4} textAnchor="middle" fontSize="7" fill="#94a3b8" fontFamily="sans-serif">
-            {label}
-          </text>
-        ))}
-
-        {/* Hover zones */}
-        {data.map((_, i) => (
-          <rect
-            key={i}
-            x={i === 0 ? PAD.left : (xs[i - 1] + xs[i]) / 2}
-            y={PAD.top}
-            width={i === 0 ? (xs[1] - xs[0]) / 2 : i === data.length - 1 ? (xs[i] - xs[i - 1]) / 2 : (xs[i + 1] - xs[i - 1]) / 2}
-            height={innerH}
-            fill="transparent"
-            onMouseEnter={() => setHoveredIdx(i)}
-          />
-        ))}
-
-        {/* Hover dot + tooltip */}
-        {hoveredIdx !== null && (
-          <>
-            <circle cx={xs[hoveredIdx]} cy={ys[hoveredIdx]} r={3} fill="#3b82f6" stroke="white" strokeWidth="1.5" />
-            <g>
-              <rect
-                x={Math.min(xs[hoveredIdx] - 25, W - 58)}
-                y={ys[hoveredIdx] - 32}
-                width={56}
-                height={24}
-                rx={3}
-                fill="#1e293b"
-                opacity={0.92}
-              />
-              {/* Date */}
-              <text
-                x={Math.min(xs[hoveredIdx] - 25, W - 58) + 28}
-                y={ys[hoveredIdx] - 22}
-                textAnchor="middle"
-                fontSize="6.5"
-                fill="#94a3b8"
-                fontFamily="sans-serif"
-                fontWeight="medium"
-              >
-                {new Date(data[hoveredIdx].recorded_at).toLocaleDateString('es-ES', { 
-                  day: '2-digit', 
-                  month: 'short',
-                  ...(spansMultipleYears ? { year: '2-digit' } : {})
-                })}
-              </text>
-              {/* Price */}
-              <text
-                x={Math.min(xs[hoveredIdx] - 25, W - 58) + 28}
-                y={ys[hoveredIdx] - 12}
-                textAnchor="middle"
-                fontSize="8"
-                fill="white"
-                fontFamily="sans-serif"
-                fontWeight="bold"
-              >
-                {Number(data[hoveredIdx][fuelKey]).toFixed(3)}€
-              </text>
-            </g>
-          </>
-        )}
-      </svg>
-    </div>
-  )
-}
+// SVG line chart removed in favor of Lightweight Charts
 
 export const StationCard = memo(({ station, isSelected, onClick }: StationCardProps) => {
   const currentDiscount = useAppStore(state => state.stationDiscounts.get(station.idEstacion) || 0)
@@ -364,7 +204,15 @@ export const StationCard = memo(({ station, isSelected, onClick }: StationCardPr
             </div>
           ) : historyData.length > 0 ? (
             <>
-              <LineChart data={historyData} fuelKey={fuelKey} />
+              <LightweightChart 
+                data={historyData
+                  .filter(d => d[fuelKey] !== null && d[fuelKey] !== undefined && Number(d[fuelKey]) >= 0.1)
+                  .map(d => ({
+                    time: new Date(d.recorded_at).toISOString().split('T')[0],
+                    value: Number(d[fuelKey])
+                  }))
+                } 
+              />
               <p className="text-[9px] text-slate-400 text-right mt-1">
                 {historyData.length} registros
               </p>
