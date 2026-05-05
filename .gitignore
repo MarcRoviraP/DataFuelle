@@ -47,4 +47,9 @@ supabase/config.toml
 
 .env*
 .venv
-*.parquet
+
+# --- ML Models and Large Data ---
+models/
+*.pkl
+data/*.parquet
+scratch/

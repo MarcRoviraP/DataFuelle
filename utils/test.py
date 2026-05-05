@@ -1,36 +1,44 @@
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_absolute_error
+import joblib
+import os
 
-# Linkear BigData con IA
+# Asegurar que existe la carpeta de modelos
+if not os.path.exists('models'):
+    os.makedirs('models')
 
-df = pd.read_csv('datos.csv')
+print("🚀 Cargando dataset...")
+df = pd.read_parquet('data/gas_prices.parquet')
 
-# Separa info (x) de predicción (y)
-x = df.drop('precio_prox_semana', axis=1)
-y = df['precio_prox_semana']
+features = ['fecha', 'gasolinera_id', 'municipio_cp', 'price_diesel', 'price_95', 'price_98', 'day_of_week', 'month']
+targets = ['target_diesel', 'target_95', 'target_98']
 
-# Dividir los datos: 80% entrenamiento, 20% prueba
-x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
+def entrenar_y_guardar(target_name):
+    print(f"\n🎯 Entrenando cerebro para {target_name}...")
+    
+    # Limpiamos nulos por si acaso
+    df_clean = df.dropna(subset=[target_name])
+    X = df_clean[features]
+    y = df_clean[target_name]
+    
+    # No hace falta split si vamos a producción, entrenamos con TODO para máxima precisión
+    modelo = RandomForestRegressor(
+        n_estimators=50, 
+        max_depth=15, 
+        n_jobs=-1, 
+        random_state=42,
+        verbose=0
+    )
+    
+    modelo.fit(X, y)
+    
+    filename = f'models/model_{target_name.replace("target_", "")}.pkl'
+    joblib.dump(modelo, filename)
+    print(f"✅ Guardado: {filename}")
 
-# Cerebro de la IA: Funcion Regressor para predecir un numero continua
-modelo = RandomForestRegressor(n_estimators=100, random_state=42)
+# Entrenamos los 3 cerebros
+for t in targets:
+    entrenar_y_guardar(t)
 
-# Entrenamiento IA
-modelo.fit(x_train, y_train)
-
-# Testeo 1: Prueba
-predicciones = modelo.predict(x_test)
-# Testeo 2: Evaluación de precisión en la predicción
-error = mean_absolute_error(y_test, predicciones)
-print(f'El modelo se equivoca en promedio por: {error} unidades de precio')
-
-'''
-PROPUESTAS
-Aumentar el machine learning de y a:
-
-    - Precio medio cada día de la semana
-    - Marcas de gasolinera mas baratas
-    - Zonas (comarcas) con el precio medio mas barato
-'''
+print("\n✨ ¡Todos los modelos están listos para ir a la web!")

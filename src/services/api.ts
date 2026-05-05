@@ -239,3 +239,32 @@ export const fetchStationHistory = async (idEstacion: number, days: number | nul
   
   return unique.sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime())
 }
+
+export const fetchBestPrediction = async (idFuelType: number, stationIds?: number[]): Promise<any | null> => {
+  const fuelColumn = idFuelType === 9 ? 'predicted_95' : 
+                     idFuelType === 12 ? 'predicted_98' : 
+                     'predicted_diesel';
+
+  // Fetch the cheapest prediction and join with station details
+  let query = supabase
+    .from('price_predictions')
+    .select(`
+      *,
+      station:stations!inner(external_id, name, brand, province, municipality, last_price_95, last_price_98, last_price_diesel)
+    `)
+    .order(fuelColumn, { ascending: true });
+
+  if (stationIds) {
+    if (stationIds.length === 0) return null;
+    query = query.in('station_id', stationIds);
+  }
+
+  const { data, error } = await query.limit(1).single();
+
+  if (error) {
+    console.error('[Prediction Fetch Error]', error);
+    return null;
+  }
+
+  return data;
+}
