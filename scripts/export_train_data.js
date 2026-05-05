@@ -3,8 +3,8 @@ import path from 'path';
 import { execSync } from 'child_process';
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = 'https://msetjsrlioiysxmgybdg.supabase.co';
-const SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1zZXRqc3JsaW9peXN4bWd5YmRnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjMzODQwNiwiZXhwIjoyMDkxOTE0NDA2fQ.V9t1wXP8fecHSPkMJS4YJz8JfLPlPGVsYQzkKZp_wjs';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://msetjsrlioiysxmgybdg.supabase.co';
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const DUCKDB_BIN = './scratch/duckdb';
 const DATA_DIR = './data';
 const OUTPUT_FILE = path.join(DATA_DIR, 'gas_prices.parquet');

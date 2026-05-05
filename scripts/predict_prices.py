@@ -5,8 +5,8 @@ import datetime
 import os
 
 # Configuración (REST API directa)
-SUPABASE_URL = 'https://msetjsrlioiysxmgybdg.supabase.co/rest/v1'
-SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1zZXRqc3JsaW9peXN4bWd5YmRnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjMzODQwNiwiZXhwIjoyMDkxOTE0NDA2fQ.V9t1wXP8fecHSPkMJS4YJz8JfLPlPGVsYQzkKZp_wjs'
+SUPABASE_URL = os.environ.get('SUPABASE_URL', 'https://msetjsrlioiysxmgybdg.supabase.co/rest/v1')
+SUPABASE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY')
 
 HEADERS = {
     "apikey": SUPABASE_KEY,
