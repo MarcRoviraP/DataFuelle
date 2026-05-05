@@ -2,8 +2,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-// Inicializamos el SDK
-const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY, { apiVersion: 'v1beta' }) : null;
+// El constructor solo acepta la API KEY
+const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
 
 export const getGeminiAdvice = async (
   poblacion: string, 
@@ -17,7 +17,11 @@ export const getGeminiAdvice = async (
     return "Configurá tu API Key para recibir consejos.";
   }
 
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  // Le pasamos la versión de la API aquí, que es donde el SDK lo permite
+  const model = genAI.getGenerativeModel(
+    { model: "gemini-2.5-flash" },
+    { apiVersion: 'v1beta' }
+  );
 
   const formatPrice = (val: any) => {
     const num = parseFloat(val) || 0;
@@ -48,8 +52,6 @@ export const getGeminiAdvice = async (
       console.warn(`⚠️ [Gemini] Intento ${attempt} fallido:`, error.message);
 
       if (attempt >= MAX_RETRIES) {
-        // No mostramos el alert aquí para no interrumpir el flujo si es una carga automática, 
-        // pero devolvemos un mensaje que el componente pueda manejar.
         return "La API está saturada, pero te recomendamos la estación mencionada arriba.";
       }
 
