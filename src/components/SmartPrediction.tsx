@@ -33,7 +33,9 @@ export const SmartPrediction = () => {
       const adviceText = await getGeminiAdvice(
         data.station.municipality || 'tu zona',
         data.station[fuelKey] || 0,
-        data[predKey] || 0
+        data[predKey] || 0,
+        data.station.name || 'la estación ganadora',
+        data.station.address || 'su ubicación actual'
       )
       setAdvice(adviceText)
     }
