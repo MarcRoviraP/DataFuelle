@@ -207,10 +207,19 @@ export const StationCard = memo(({ station, isSelected, onClick }: StationCardPr
               <LightweightChart 
                 data={historyData
                   .filter(d => d[fuelKey] !== null && d[fuelKey] !== undefined && Number(d[fuelKey]) >= 0.1)
-                  .map(d => ({
-                    time: new Date(d.recorded_at).toISOString().split('T')[0],
-                    value: Number(d[fuelKey])
-                  }))
+                  .map(d => {
+                    try {
+                      const date = new Date(d.recorded_at)
+                      if (isNaN(date.getTime())) return null
+                      return {
+                        time: date.toISOString().split('T')[0],
+                        value: Number(d[fuelKey])
+                      }
+                    } catch (e) {
+                      return null
+                    }
+                  })
+                  .filter((item): item is {time: string, value: number} => item !== null)
                 } 
               />
               <p className="text-[9px] text-slate-400 text-right mt-1">

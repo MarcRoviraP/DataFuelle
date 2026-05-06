@@ -96,10 +96,32 @@ export const LightweightChart: React.FC<LightweightChartProps> = ({
       },
     })
 
-    // Sort data by time (lightweight-charts requirement)
-    const sortedData = [...data].sort((a, b) => a.time.localeCompare(b.time))
-    series.setData(sortedData)
-    chart.timeScale().fitContent()
+    // Sort and sanitize data by time (lightweight-charts requirement)
+    // We also must ensure time is strictly increasing and unique
+    console.log('[Chart] Setting initial data:', data)
+    
+    const sanitizedData = data
+      .filter(item => item.time && item.value !== null && !isNaN(item.value))
+      .sort((a, b) => a.time.localeCompare(b.time))
+    
+    // Deduplicate by time (keeping the last value for each time slot)
+    const uniqueData: ChartData[] = []
+    const seenTimes = new Set()
+    for (let i = sanitizedData.length - 1; i >= 0; i--) {
+      if (!seenTimes.has(sanitizedData[i].time)) {
+        uniqueData.unshift(sanitizedData[i])
+        seenTimes.add(sanitizedData[i].time)
+      }
+    }
+
+    if (uniqueData.length > 0) {
+      try {
+        series.setData(uniqueData)
+        chart.timeScale().fitContent()
+      } catch (err) {
+        console.error('[Chart] Error setting data:', err, uniqueData)
+      }
+    }
 
     chartRef.current = chart
     seriesRef.current = series
@@ -123,9 +145,28 @@ export const LightweightChart: React.FC<LightweightChartProps> = ({
   // Update data when it changes
   useEffect(() => {
     if (seriesRef.current && data.length > 0) {
-      const sortedData = [...data].sort((a, b) => a.time.localeCompare(b.time))
-      seriesRef.current.setData(sortedData)
-      chartRef.current?.timeScale().fitContent()
+      console.log('[Chart] Updating data:', data)
+      const sanitizedData = data
+        .filter(item => item.time && item.value !== null && !isNaN(item.value))
+        .sort((a, b) => a.time.localeCompare(b.time))
+      
+      const uniqueData: ChartData[] = []
+      const seenTimes = new Set()
+      for (let i = sanitizedData.length - 1; i >= 0; i--) {
+        if (!seenTimes.has(sanitizedData[i].time)) {
+          uniqueData.unshift(sanitizedData[i])
+          seenTimes.add(sanitizedData[i].time)
+        }
+      }
+
+      if (uniqueData.length > 0) {
+        try {
+          seriesRef.current.setData(uniqueData)
+          chartRef.current?.timeScale().fitContent()
+        } catch (err) {
+          console.error('[Chart] Error updating data:', err, uniqueData)
+        }
+      }
     }
   }, [data])
 

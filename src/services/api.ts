@@ -235,7 +235,21 @@ export const fetchStationHistory = async (idEstacion: number, days: number | nul
 
   // 3. Combinar y de-duplicar (por si hay solapamiento)
   const combined = [...historicalData, ...dbData]
-  const unique = Array.from(new Map(combined.map(item => [item.recorded_at, item])).values())
+  
+  // Filter out any entries with invalid dates or missing all prices
+  const validCombined = combined.filter(item => {
+    if (!item.recorded_at) return false
+    const date = new Date(item.recorded_at)
+    return !isNaN(date.getTime()) && (item.price_95 !== null || item.price_98 !== null || item.price_diesel !== null)
+  })
+
+  // Deduplicate by timestamp (recorded_at)
+  const uniqueMap = new Map()
+  validCombined.forEach(item => {
+    uniqueMap.set(item.recorded_at, item)
+  })
+  
+  const unique = Array.from(uniqueMap.values())
   
   return unique.sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime())
 }
