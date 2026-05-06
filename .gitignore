@@ -53,3 +53,4 @@ models/
 *.pkl
 data/*.parquet
 scratch/
+fuel_prices*.parquet

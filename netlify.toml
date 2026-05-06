@@ -13,3 +13,5 @@
 #   SUPABASE_SERVICE_ROLE_KEY  → service role key from Supabase → Settings → API
 [functions."sync-miteco-cron-background"]
   schedule = "0 0,12 * * *"
+[functions."predict_prices_cron_background"]
+  schedule = "0 0 * * 1"
