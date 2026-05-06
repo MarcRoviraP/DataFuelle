@@ -3,6 +3,12 @@ import { createClient } from '@supabase/supabase-js';
 export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://msetjsrlioiysxmgybdg.supabase.co';
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
+if (!ANON_KEY) {
+  console.error('❌ CRÍTICO: VITE_SUPABASE_ANON_KEY no encontrada. El frontend no podrá conectar con Supabase. Verificá tus variables de entorno en Netlify.');
+} else if (!ANON_KEY.startsWith('sb_publishable_')) {
+  console.warn('⚠️ ADVERTENCIA: La clave ANON no parece ser una Publishable Key moderna (debe empezar con sb_publishable_).');
+}
+
 export const supabase = createClient(SUPABASE_URL, ANON_KEY, {
   auth: {
     persistSession: true,
