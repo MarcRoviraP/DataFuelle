@@ -94,6 +94,13 @@ interface AppState {
   updateFilteredStations: () => void
   syncProfile: () => Promise<void>
   signOut: () => Promise<void>
+
+  // Routing
+  routeCoordinates: [number, number][] | null
+  routeInfo: { distance: number; duration: number } | null
+  activeRouteStationId: number | null
+  fetchRoute: (stationId: number, stationLat: number, stationLng: number) => Promise<void>
+  clearRoute: () => void
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -219,7 +226,49 @@ export const useAppStore = create<AppState>((set, get) => ({
   setFilteredStations: (stations) => set({ filteredStations: stations }),
 
   selectedStationId: null,
-  setSelectedStationId: (id) => set({ selectedStationId: id }),
+  setSelectedStationId: (id) => {
+    set({ selectedStationId: id })
+    if (id === null) {
+      get().clearRoute()
+    }
+  },
+
+  routeCoordinates: null,
+  routeInfo: null,
+  activeRouteStationId: null,
+
+  fetchRoute: async (stationId, stationLat, stationLng) => {
+    const { currentLocation } = get()
+    if (!currentLocation) {
+      console.warn("⚠️ No se puede trazar la ruta sin ubicación actual.")
+      return
+    }
+
+    try {
+      const url = `https://router.project-osrm.org/route/v1/driving/${currentLocation.lon},${currentLocation.lat};${stationLng},${stationLat}?overview=full&geometries=geojson`
+      const response = await fetch(url)
+      if (!response.ok) throw new Error("Error en la respuesta de OSRM")
+      const data = await response.json()
+      
+      if (data.routes && data.routes.length > 0) {
+        const route = data.routes[0]
+        const coords = route.geometry.coordinates.map((c: any) => [c[1], c[0]] as [number, number])
+        
+        set({
+          routeCoordinates: coords,
+          routeInfo: {
+            distance: route.distance,
+            duration: route.duration
+          },
+          activeRouteStationId: stationId
+        })
+      }
+    } catch (error) {
+      console.error("❌ [Store Route] Error al obtener ruta:", error)
+    }
+  },
+
+  clearRoute: () => set({ routeCoordinates: null, routeInfo: null, activeRouteStationId: null }),
 
   isLoading: false,
   setIsLoading: (isLoading) => set({ isLoading }),
