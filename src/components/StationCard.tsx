@@ -1,6 +1,6 @@
 import { useState, memo, useRef } from 'react'
 import { fetchStationHistory, type Station } from '../services/api'
-import { MapPin, Clock, Navigation, Tag, Calendar, TrendingUp, ChevronDown, ChevronUp } from 'lucide-react'
+import { MapPin, Clock, Navigation, Tag, Calendar, TrendingUp, ChevronDown, ChevronUp, Heart } from 'lucide-react'
 import { shouldShowLastUpdate, formatLastUpdate } from '../utils/date'
 import { formatDistance } from '../utils/geo'
 import { useAppStore } from '../store/useAppStore'
@@ -31,6 +31,9 @@ export const StationCard = memo(({ station, isSelected, onClick }: StationCardPr
   const currentDiscount = useAppStore(state => state.stationDiscounts.get(station.idEstacion) || 0)
   const setStationDiscount = useAppStore(state => state.setStationDiscount)
   const selectedFuelTypeId = useAppStore(state => state.selectedFuelTypeId)
+  const favoriteStationIds = useAppStore(state => state.favoriteStationIds)
+  const toggleFavorite = useAppStore(state => state.toggleFavorite)
+  const isFav = favoriteStationIds.includes(station.idEstacion)
 
   const [showHistory, setShowHistory] = useState(false)
   const [activeDays, setActiveDays] = useState<number | null>(7)
@@ -90,7 +93,22 @@ export const StationCard = memo(({ station, isSelected, onClick }: StationCardPr
       onClick={onClick}
     >
       <div className="flex justify-between items-start mb-2 group">
-        <h3 className="font-bold text-gray-900 leading-tight flex-1 pr-1 line-clamp-3 overflow-hidden text-xs uppercase">{station.nombreEstacion}</h3>
+        <div className="flex items-start gap-2 flex-1 min-w-0 pr-1">
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              toggleFavorite(station.idEstacion)
+            }}
+            className="p-1 text-slate-300 hover:text-red-500 hover:scale-110 active:scale-95 transition-all shrink-0 cursor-pointer"
+            title={isFav ? "Quitar de favoritos" : "Guardar en favoritos"}
+          >
+            <Heart 
+              size={18} 
+              className={isFav ? "text-red-500 fill-red-500 animate-in zoom-in duration-300" : "text-slate-300 hover:text-red-400"} 
+            />
+          </button>
+          <h3 className="font-bold text-gray-900 leading-tight line-clamp-3 overflow-hidden text-xs uppercase">{station.nombreEstacion}</h3>
+        </div>
         <div className="flex flex-col items-end">
           <div className="flex items-baseline gap-1.5 flex-wrap justify-end">
             {currentDiscount > 0 && station.precioBase && (

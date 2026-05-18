@@ -83,6 +83,12 @@ interface AppState {
   removeUserCar: (carId: number) => Promise<void>
   setSelectedCarId: (id: number | null) => Promise<void>
 
+  // Favorites
+  favoriteStationIds: number[]
+  toggleFavorite: (stationId: number) => void
+  showOnlyFavorites: boolean
+  setShowOnlyFavorites: (showOnlyFavorites: boolean) => void
+
   // Actions
   fetchStations: () => Promise<void>
   updateFilteredStations: () => void
@@ -217,6 +223,39 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   isLoading: false,
   setIsLoading: (isLoading) => set({ isLoading }),
+
+  favoriteStationIds: (() => {
+    try {
+      const stored = localStorage.getItem('datafuelle_favorites')
+      return stored ? JSON.parse(stored) : []
+    } catch {
+      return []
+    }
+  })(),
+  toggleFavorite: (stationId: number) => {
+    const favorites = [...get().favoriteStationIds]
+    const index = favorites.indexOf(stationId)
+    if (index > -1) {
+      favorites.splice(index, 1)
+    } else {
+      favorites.push(stationId)
+    }
+    set({ favoriteStationIds: favorites })
+    try {
+      localStorage.setItem('datafuelle_favorites', JSON.stringify(favorites))
+    } catch (e) {
+      console.error('Error saving favorites to localStorage:', e)
+    }
+    get().updateFilteredStations()
+    if (get().user) {
+      get().syncProfile()
+    }
+  },
+  showOnlyFavorites: false,
+  setShowOnlyFavorites: (showOnlyFavorites) => {
+    set({ showOnlyFavorites })
+    get().updateFilteredStations()
+  },
 
   searchHistory: [],
   addToHistory: (query) => {
@@ -359,7 +398,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   updateFilteredStations: () => {
-    const { stations, radius, selectedBrands, sortBy, showOnlyOpen, showOnlyUpdatedToday, stationDiscounts, userCars, selectedCarId } = get()
+    const { stations, radius, selectedBrands, sortBy, showOnlyOpen, showOnlyUpdatedToday, stationDiscounts, userCars, selectedCarId, showOnlyFavorites, favoriteStationIds } = get()
     
     let filtered = stations.map(s => ({
       ...s,
@@ -372,6 +411,11 @@ export const useAppStore = create<AppState>((set, get) => ({
         const marca = s.marca?.toUpperCase() || ''
         return selectedBrands.some(b => marca.includes(b.toUpperCase()))
       })
+    }
+
+    // Filter by Favorites
+    if (showOnlyFavorites) {
+      filtered = filtered.filter(s => favoriteStationIds.includes(s.idEstacion))
     }
 
     // Filter by Open Now
@@ -535,7 +579,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   syncProfile: async () => {
-    const { user, selectedFuelTypeId, radius, showOnlyOpen, showOnlyUpdatedToday, selectedBrands, searchHistory, stationDiscounts } = get()
+    const { user, selectedFuelTypeId, radius, showOnlyOpen, showOnlyUpdatedToday, selectedBrands, searchHistory, stationDiscounts, favoriteStationIds } = get()
     if (!user || isInitialLoad) return
 
     if (syncTimeout) clearTimeout(syncTimeout)
@@ -552,6 +596,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           selected_brands: selectedBrands,
           search_history: searchHistory,
           station_discounts: Array.from(stationDiscounts.entries()),
+          favorite_station_ids: favoriteStationIds,
           updated_at: new Date().toISOString()
         })
         
@@ -630,8 +675,15 @@ supabase.auth.onAuthStateChange(async (event, session) => {
             showOnlyUpdatedToday: profile.show_only_updated_today,
             selectedBrands: profile.selected_brands || [],
             searchHistory: profile.search_history || [],
-            stationDiscounts: new Map(profile.station_discounts || [])
+            stationDiscounts: new Map(profile.station_discounts || []),
+            favoriteStationIds: profile.favorite_station_ids || []
           })
+
+          try {
+            localStorage.setItem('datafuelle_favorites', JSON.stringify(profile.favorite_station_ids || []))
+          } catch (e) {
+            console.error('Error syncing loaded favorites to localStorage:', e)
+          }
 
           console.log('🏎️ [Auth] Loading garage...')
           try {

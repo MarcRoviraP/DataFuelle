@@ -149,7 +149,7 @@ const fmt = (v: number | null | undefined) =>
   v && v > 0 ? `${v.toFixed(3)} €/L` : '—'
 
 export const MapView = () => {
-  const { filteredStations, currentLocation, selectedFuelTypeId, selectedStationId, stationDiscounts, radius, isLoading } = useAppStore()
+  const { filteredStations, currentLocation, selectedFuelTypeId, selectedStationId, stationDiscounts, radius, isLoading, favoriteStationIds } = useAppStore()
   const [visualRadius, setVisualRadius] = useState<number>(0)
   const defaultCenter: [number, number] = [39.4699, -0.3763]
   const markerRefs = useRef<Map<number, L.Marker>>(new Map())
@@ -418,12 +418,47 @@ export const MapView = () => {
               <Popup minWidth={200}>
                 {/* ... existing popup content ... */}
                 <div style={{ padding: '4px 2px', minWidth: 200 }}>
-                  <h4 style={{
-                    fontWeight: 600, fontSize: 13, color: '#0f172a',
-                    borderBottom: '1px solid #e2e8f0', paddingBottom: 6, marginBottom: 8
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    borderBottom: '1px solid #e2e8f0',
+                    paddingBottom: 6,
+                    marginBottom: 8,
+                    gap: 8
                   }}>
-                    {station.nombreEstacion}
-                  </h4>
+                    <h4 style={{
+                      fontWeight: 600, fontSize: 13, color: '#0f172a',
+                      margin: 0,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      flex: 1
+                    }}>
+                      {station.nombreEstacion}
+                    </h4>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        useAppStore.getState().toggleFavorite(station.idEstacion)
+                      }}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: 2,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: favoriteStationIds.includes(station.idEstacion) ? '#ef4444' : '#94a3b8'
+                      }}
+                      title={favoriteStationIds.includes(station.idEstacion) ? "Quitar de favoritos" : "Guardar en favoritos"}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill={favoriteStationIds.includes(station.idEstacion) ? "#ef4444" : "none"} stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'all 0.2s' }}>
+                        <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
+                      </svg>
+                    </button>
+                  </div>
 
                   {/* 3 fuel prices */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 8 }}>

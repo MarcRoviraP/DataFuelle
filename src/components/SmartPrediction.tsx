@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { Sparkles, ArrowRight, MapPin, Calendar, TrendingDown } from 'lucide-react'
-import { fetchBestPrediction } from '../services/api'
+import { fetchPredictions } from '../services/api'
 import { getGeminiAdvice } from '../services/gemini'
 import { useAppStore } from '../store/useAppStore'
 
 export const SmartPrediction = () => {
-  const { selectedFuelTypeId, fuelTypes, filteredStations } = useAppStore()
+  const { selectedFuelTypeId, fuelTypes, filteredStations, userCars, selectedCarId } = useAppStore()
   const [bestStation, setBestStation] = useState<any | null>(null)
   const [advice, setAdvice] = useState<string>('')
   const [loading, setLoading] = useState(false)
@@ -19,25 +19,102 @@ export const SmartPrediction = () => {
     
     // Solo predecir para las estaciones que están en el radio/zona actual
     const stationIds = filteredStations.map(s => s.idEstacion)
-    const data = await fetchBestPrediction(selectedFuelTypeId, stationIds)
-    setBestStation(data)
+    const predictions = await fetchPredictions(selectedFuelTypeId, stationIds)
 
-    if (data) {
-      const fuelKey = selectedFuelTypeId === 9 ? 'last_price_95' : 
-                      selectedFuelTypeId === 12 ? 'last_price_98' : 
-                      'last_price_diesel';
-      const predKey = selectedFuelTypeId === 9 ? 'predicted_95' : 
-                      selectedFuelTypeId === 12 ? 'predicted_98' : 
-                      'predicted_diesel';
-      
-      const adviceText = await getGeminiAdvice(
-        data.station.municipality || 'tu zona',
-        data.station[fuelKey] || 0,
-        data[predKey] || 0,
-        data.station.name || 'la estación ganadora',
-        data.station.address || 'su ubicación actual'
-      )
-      setAdvice(adviceText)
+    const predKey = selectedFuelTypeId === 9 ? 'predicted_95' : 
+                    selectedFuelTypeId === 12 ? 'predicted_98' : 
+                    'predicted_diesel';
+
+    if (predictions && predictions.length > 0) {
+      const selectedCar = userCars.find(c => c.id === selectedCarId)
+      let best = null
+
+      if (selectedCar && selectedCar.consumo_l_100km > 0) {
+        // Advanced Smart Filter: Based on REAL COST (Fuel + Time)
+        const consumo_km = selectedCar.consumo_l_100km / 100
+        const LITROS_REPOSTAJE_ESTIMADO = 35 // Un tanque parcial más realista
+        const VALOR_TIEMPO_HORA = 12 // €/hora (costo de oportunidad)
+        const VELOCIDAD_MEDIA_KMH = 35 // km/h (estimación urbana/mixta)
+
+        const scored = predictions.map(p => {
+          const stationInFiltered = filteredStations.find(s => s.idEstacion === p.station_id)
+          const dist = stationInFiltered?.distancia || 0
+          const predictedPrice = p[predKey] || 9.99
+
+          // Coste de combustible (ir y volver)
+          const costeCombustibleViaje = dist * 2 * predictedPrice * consumo_km
+          // Coste de tiempo (estimado)
+          const tiempoViajeHoras = (dist * 2) / VELOCIDAD_MEDIA_KMH
+          const costeTiempo = tiempoViajeHoras * VALOR_TIEMPO_HORA
+          
+          // Gasto Total = Precio del combustible + Gasto de viaje + Coste de tiempo
+          const gastoTotal = (predictedPrice * LITROS_REPOSTAJE_ESTIMADO) + costeCombustibleViaje + costeTiempo
+          
+          return { prediction: p, score: gastoTotal }
+        })
+
+        scored.sort((a, b) => a.score - b.score)
+        best = scored[0].prediction
+      } else {
+        // Fallback to basic smart normalization with HEAVY distance weight
+        const predictionsWithDistance = predictions.map(p => {
+          const stationInFiltered = filteredStations.find(s => s.idEstacion === p.station_id)
+          const dist = stationInFiltered?.distancia || 0
+          const predictedPrice = p[predKey] || 9.99
+          return { prediction: p, dist, price: predictedPrice }
+        })
+
+        const distances = predictionsWithDistance.map(item => item.dist)
+        const prices = predictionsWithDistance.map(item => item.price)
+
+        const minDist = Math.min(...distances)
+        const maxDist = Math.max(...distances)
+        const minPrice = Math.min(...prices)
+        const maxPrice = Math.max(...prices)
+
+        const norm = (val: number, min: number, max: number, margin = 0) => {
+          const range = max - min
+          if (range <= margin) return 0
+          return (val - min) / range
+        }
+
+        const scored = predictionsWithDistance.map(item => {
+          // Le damos 70% de peso a la distancia y 30% al precio predicho
+          const dScore = norm(item.dist, minDist, maxDist)
+          // Usamos un margen de 0.03€ para que variaciones pequeñas no disparen el score
+          const pScore = norm(item.price, minPrice, maxPrice, 0.03)
+          const score = dScore * 0.7 + pScore * 0.3
+          
+          return { prediction: item.prediction, score }
+        })
+
+        scored.sort((a, b) => a.score - b.score)
+        best = scored[0].prediction
+      }
+
+      setBestStation(best)
+
+      if (best) {
+        const fuelKey = selectedFuelTypeId === 9 ? 'last_price_95' : 
+                        selectedFuelTypeId === 12 ? 'last_price_98' : 
+                        'last_price_diesel';
+        
+        const carModel = selectedCar ? `${selectedCar.make} ${selectedCar.model}` : undefined
+        const carConsumo = selectedCar ? selectedCar.consumo_l_100km : undefined
+
+        const adviceText = await getGeminiAdvice(
+          best.station.municipality || 'tu zona',
+          best.station[fuelKey] || 0,
+          best[predKey] || 0,
+          best.station.name || 'la estación ganadora',
+          best.station.address || 'su ubicación actual',
+          carModel,
+          carConsumo
+        )
+        setAdvice(adviceText)
+      }
+    } else {
+      setBestStation(null)
     }
 
     setLoading(false)
