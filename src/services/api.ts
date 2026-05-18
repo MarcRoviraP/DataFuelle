@@ -151,55 +151,66 @@ let isMitecoHealthy = true
 let lastHealthCheck = 0
 let isCheckingHealth = false
 
-export const checkMitecoHealthStatus = async (force = false): Promise<boolean> => {
+export const prefetchMitecoData = async (force = false): Promise<any[]> => {
   const now = Date.now()
-  if (!force && (now - lastHealthCheck) < 30 * 60 * 1000) {
-    return isMitecoHealthy
+  if (!force && mitecoCache && (now - mitecoCache.timestamp) < CACHE_DURATION) {
+    return mitecoCache.data
   }
 
-  if (isCheckingHealth) return isMitecoHealthy
+  if (isCheckingHealth) {
+    if (pendingMitecoFetch) return pendingMitecoFetch
+    return mitecoCache?.data || []
+  }
+  
   isCheckingHealth = true
+  console.log('📡 [MITECO Prefetch] Precargando todas las gasolineras de España en segundo plano para cachear en memoria...')
+  
+  pendingMitecoFetch = (async () => {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 12000) // 12s para descargar el listado completo
 
-  console.log('📡 [MITECO Health] Comprobando disponibilidad de la API de MITECO (Ping)...')
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 4000) // Timeout rápido de 4s para evitar demoras
+    try {
+      const response = await fetch(MITECO_URL, { signal: controller.signal })
+      clearTimeout(timeoutId)
 
-  try {
-    const response = await fetch(MITECO_URL, {
-      method: 'HEAD',
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; DataFuelle-Health/1.0)'
-      }
-    })
-    clearTimeout(timeoutId)
-
-    // Si devuelve 503 está caída. Un 405 (Method Not Allowed) u otro código HTTP exitoso significa que el server responde y está activo.
-    if (response.status === 503) {
+      if (!response.ok) throw new Error(`MITECO API error status: ${response.status}`)
+      
+      const json = await response.json()
+      const data = json.ListaEESSPrecio || []
+      
+      mitecoCache = { data, timestamp: Date.now() }
+      isMitecoHealthy = true
+      console.log(`📡 [MITECO Prefetch] ¡Éxito! ${data.length} gasolineras precargadas en caché de memoria.`)
+      return data
+    } catch (err) {
+      clearTimeout(timeoutId)
+      console.error('❌ [MITECO Prefetch Error] No se pudo descargar la base de datos de MITECO en segundo plano:', err)
       isMitecoHealthy = false
-    } else {
-      isMitecoHealthy = response.ok || (response.status >= 200 && response.status < 400) || response.status === 405
+      return []
+    } finally {
+      pendingMitecoFetch = null
+      isCheckingHealth = false
+      lastHealthCheck = Date.now()
     }
-  } catch (err) {
-    clearTimeout(timeoutId)
-    console.error('❌ [MITECO Health] Fallo al hacer ping a MITECO:', err)
-    isMitecoHealthy = false
-  } finally {
-    lastHealthCheck = Date.now()
-    isCheckingHealth = false
-    console.log(`📡 [MITECO Health] Estado actualizado: isMitecoHealthy = ${isMitecoHealthy}`)
-  }
+  })()
 
+  return pendingMitecoFetch
+}
+
+export const checkMitecoHealthStatus = async (force = false): Promise<boolean> => {
+  if (force || (Date.now() - lastHealthCheck) > CACHE_DURATION) {
+    await prefetchMitecoData(true)
+  }
   return isMitecoHealthy
 }
 
-// Ejecución periódica cada 30 minutos
+// Ejecución periódica cada 30 minutos para renovar la caché
 setInterval(async () => {
-  await checkMitecoHealthStatus(true)
-}, 30 * 60 * 1000)
+  await prefetchMitecoData(true)
+}, CACHE_DURATION)
 
-// Primer ping asincrónico al cargar el módulo
-checkMitecoHealthStatus(true)
+// Arrancamos la precarga completa en segundo plano inmediatamente al importar el módulo
+prefetchMitecoData(true)
 
 export const fetchStationsByRadius = async (
   latitud: number,
@@ -209,56 +220,31 @@ export const fetchStationsByRadius = async (
 ): Promise<Station[]> => {
   const now = Date.now()
 
-  // Si sabemos de antemano que la API de MITECO está caída por el ping en segundo plano,
+  // Si sabemos de antemano que la API de MITECO está caída por la precarga en segundo plano,
   // cargamos directamente de Supabase evitando esperas inútiles.
   if (!isMitecoHealthy) {
-    console.warn('⚠️ [MITECO Health] API marcada como caída en segundo plano. Cargando directamente de Supabase de forma rápida...');
+    console.warn('⚠️ [MITECO Health] API marcada como caída en segundo plano. Cargando directamente de Supabase para la zona actual...');
     return fetchStationsFromSupabaseBackup(latitud, longitud, radio, idFuelType)
   }
   
   let rawStations: any[] = []
   if (mitecoCache && (now - mitecoCache.timestamp) < CACHE_DURATION) {
-    console.log('[MITECO] Using cached data')
+    console.log('[MITECO] Usando datos ya precargados y cacheados en memoria.')
     rawStations = mitecoCache.data
-  } else if (pendingMitecoFetch) {
-    console.log('[MITECO] Waiting for existing fetch to complete...')
-    rawStations = await pendingMitecoFetch
   } else {
-    console.log('[MITECO] Fetching fresh data from Ministry...')
-    
-    pendingMitecoFetch = (async () => {
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 10000)
-
-      try {
-        const response = await fetch(MITECO_URL, { signal: controller.signal })
-        clearTimeout(timeoutId)
-        
-        if (!response.ok) throw new Error(`MITECO API Error: ${response.status}`)
-        const json = await response.json()
-        const data = json.ListaEESSPrecio || []
-        mitecoCache = { data, timestamp: Date.now() }
-        console.log(`[MITECO] Loaded ${data.length} stations`)
-        return data
-      } catch (err: any) {
-        clearTimeout(timeoutId)
-        console.error('[MITECO Fetch Error]', err)
-        // Auto-marcar como caída para subsiguientes llamadas
-        isMitecoHealthy = false
-        lastHealthCheck = Date.now()
-        return []
-      } finally {
-        pendingMitecoFetch = null
-      }
-    })()
-
-    rawStations = await pendingMitecoFetch
+    try {
+      console.log('[MITECO] Datos no disponibles en caché o vencidos. Iniciando o esperando precarga en segundo plano...')
+      rawStations = await prefetchMitecoData()
+    } catch (err) {
+      console.error('[MITECO] Error al precargar datos para consulta por radio:', err)
+      rawStations = []
+    }
   }
 
   // Si la API de MITECO retornó un array vacío por error (por ejemplo, por un 503 o falla de conexión),
   // se activa el respaldo con la base de datos de Supabase.
   if (rawStations.length === 0) {
-    console.warn('⚠️ [MITECO] API no disponible o retornó error (0 estaciones). Activando respaldo desde la base de datos de Supabase...');
+    console.warn('⚠️ [MITECO] API no disponible o retornó error (0 estaciones). Activando respaldo desde la base de datos de Supabase para la zona actual...');
     return fetchStationsFromSupabaseBackup(latitud, longitud, radio, idFuelType)
   }
 
