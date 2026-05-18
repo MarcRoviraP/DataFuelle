@@ -70,6 +70,137 @@ const cleanStationName = (name: string) => {
     .join(' ')
 }
 
+const fetchStationsFromSupabaseBackup = async (
+  latitud: number,
+  longitud: number,
+  radio: number,
+  idFuelType: number
+): Promise<Station[]> => {
+  console.log('⚠️ [Supabase Backup] Iniciando consulta de respaldo en Supabase...');
+  try {
+    // Cálculo aproximado de la caja delimitadora (bounding box) para optimizar la consulta
+    // 1 grado de latitud es aproximadamente 111 km
+    const deltaLat = radio / 111
+    // 1 grado de longitud es aproximadamente 111 * cos(latitud) km
+    const deltaLon = radio / (111 * Math.cos(latitud * Math.PI / 180))
+
+    const minLat = latitud - deltaLat
+    const maxLat = latitud + deltaLat
+    const minLon = longitud - deltaLon
+    const maxLon = longitud + deltaLon
+
+    console.log(`[Supabase Backup] Rango de búsqueda: Lat [${minLat.toFixed(4)}, ${maxLat.toFixed(4)}], Lon [${minLon.toFixed(4)}, ${maxLon.toFixed(4)}]`);
+
+    // Consultamos la tabla 'stations' usando el cliente de supabase
+    const { data, error } = await supabase
+      .from('stations')
+      .select('*')
+      .gte('latitude', minLat)
+      .lte('latitude', maxLat)
+      .gte('longitude', minLon)
+      .lte('longitude', maxLon)
+
+    if (error) throw error
+
+    if (!data || data.length === 0) {
+      console.warn('[Supabase Backup] No se encontraron estaciones en el bounding box de Supabase.');
+      return []
+    }
+
+    console.log(`[Supabase Backup] Se recuperaron ${data.length} estaciones de Supabase.`);
+
+    const fuelKey = idFuelType === 9 ? 'last_price_95' : 
+                    idFuelType === 12 ? 'last_price_98' : 
+                    'last_price_diesel'
+
+    return data
+      .map((s: any) => {
+        const price = s[fuelKey] || 0
+        const dist = calculateDistance(latitud, longitud, s.latitude, s.longitude)
+        
+        return {
+          idEstacion: s.external_id,
+          nombreEstacion: cleanStationName(s.name || 'Estación sin nombre'),
+          direccion: s.address || '',
+          municipio: s.municipality || '',
+          provincia: s.province || '',
+          latitud: s.latitude,
+          longitud: s.longitude,
+          horario: s.schedule || '',
+          marca: s.brand || '',
+          margen: '',
+          codPostal: s.postal_code || '',
+          precioCombustible: price,
+          precioBase: price,
+          precioG95: s.last_price_95 || null,
+          precioG98: s.last_price_98 || null,
+          precioDiesel: s.last_price_diesel || null,
+          distancia: dist,
+          lastUpdate: s.updated_at || new Date().toISOString()
+        }
+      })
+      .filter(s => s.distancia <= radio && s.precioCombustible >= 0.1)
+      .sort((a, b) => a.distancia - b.distancia)
+  } catch (dbErr) {
+    console.error('❌ [Supabase Backup Error] Falló la recuperación de respaldo de base de datos:', dbErr)
+    return []
+  }
+}
+
+let isMitecoHealthy = true
+let lastHealthCheck = 0
+let isCheckingHealth = false
+
+export const checkMitecoHealthStatus = async (force = false): Promise<boolean> => {
+  const now = Date.now()
+  if (!force && (now - lastHealthCheck) < 30 * 60 * 1000) {
+    return isMitecoHealthy
+  }
+
+  if (isCheckingHealth) return isMitecoHealthy
+  isCheckingHealth = true
+
+  console.log('📡 [MITECO Health] Comprobando disponibilidad de la API de MITECO (Ping)...')
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 4000) // Timeout rápido de 4s para evitar demoras
+
+  try {
+    const response = await fetch(MITECO_URL, {
+      method: 'HEAD',
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; DataFuelle-Health/1.0)'
+      }
+    })
+    clearTimeout(timeoutId)
+
+    // Si devuelve 503 está caída. Un 405 (Method Not Allowed) u otro código HTTP exitoso significa que el server responde y está activo.
+    if (response.status === 503) {
+      isMitecoHealthy = false
+    } else {
+      isMitecoHealthy = response.ok || (response.status >= 200 && response.status < 400) || response.status === 405
+    }
+  } catch (err) {
+    clearTimeout(timeoutId)
+    console.error('❌ [MITECO Health] Fallo al hacer ping a MITECO:', err)
+    isMitecoHealthy = false
+  } finally {
+    lastHealthCheck = Date.now()
+    isCheckingHealth = false
+    console.log(`📡 [MITECO Health] Estado actualizado: isMitecoHealthy = ${isMitecoHealthy}`)
+  }
+
+  return isMitecoHealthy
+}
+
+// Ejecución periódica cada 30 minutos
+setInterval(async () => {
+  await checkMitecoHealthStatus(true)
+}, 30 * 60 * 1000)
+
+// Primer ping asincrónico al cargar el módulo
+checkMitecoHealthStatus(true)
+
 export const fetchStationsByRadius = async (
   latitud: number,
   longitud: number,
@@ -77,6 +208,13 @@ export const fetchStationsByRadius = async (
   idFuelType: number
 ): Promise<Station[]> => {
   const now = Date.now()
+
+  // Si sabemos de antemano que la API de MITECO está caída por el ping en segundo plano,
+  // cargamos directamente de Supabase evitando esperas inútiles.
+  if (!isMitecoHealthy) {
+    console.warn('⚠️ [MITECO Health] API marcada como caída en segundo plano. Cargando directamente de Supabase de forma rápida...');
+    return fetchStationsFromSupabaseBackup(latitud, longitud, radio, idFuelType)
+  }
   
   let rawStations: any[] = []
   if (mitecoCache && (now - mitecoCache.timestamp) < CACHE_DURATION) {
@@ -105,6 +243,9 @@ export const fetchStationsByRadius = async (
       } catch (err: any) {
         clearTimeout(timeoutId)
         console.error('[MITECO Fetch Error]', err)
+        // Auto-marcar como caída para subsiguientes llamadas
+        isMitecoHealthy = false
+        lastHealthCheck = Date.now()
         return []
       } finally {
         pendingMitecoFetch = null
@@ -112,6 +253,13 @@ export const fetchStationsByRadius = async (
     })()
 
     rawStations = await pendingMitecoFetch
+  }
+
+  // Si la API de MITECO retornó un array vacío por error (por ejemplo, por un 503 o falla de conexión),
+  // se activa el respaldo con la base de datos de Supabase.
+  if (rawStations.length === 0) {
+    console.warn('⚠️ [MITECO] API no disponible o retornó error (0 estaciones). Activando respaldo desde la base de datos de Supabase...');
+    return fetchStationsFromSupabaseBackup(latitud, longitud, radio, idFuelType)
   }
 
   // Map MITECO fields to our Station interface
