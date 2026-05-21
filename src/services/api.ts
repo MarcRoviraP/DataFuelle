@@ -388,14 +388,22 @@ export const fetchStationHistory = async (idEstacion: number, days: number | nul
   return unique.sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime())
 }
 
-export const fetchPredictions = async (idFuelType: number, stationIds?: number[]): Promise<any[]> => {
+export const fetchPredictions = async (_idFuelType: number, stationIds?: number[]): Promise<any[]> => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  const todayStr = `${year}-${month}-${day}`;
+
   // Fetch predictions and join with station details
   let query = supabase
     .from('price_predictions')
     .select(`
       *,
       station:stations!inner(external_id, name, brand, province, municipality, address, last_price_95, last_price_98, last_price_diesel)
-    `);
+    `)
+    .gte('target_date', todayStr)
+    .order('target_date', { ascending: true });
 
   if (stationIds) {
     if (stationIds.length === 0) return [];

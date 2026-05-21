@@ -6,7 +6,9 @@ import os
 
 # Configuración (REST API directa)
 SUPABASE_URL = os.environ.get('SUPABASE_URL', 'https://msetjsrlioiysxmgybdg.supabase.co/rest/v1')
-SUPABASE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY')
+if not SUPABASE_URL.endswith('/rest/v1'):
+    SUPABASE_URL = SUPABASE_URL.rstrip('/') + '/rest/v1'
+SUPABASE_KEY = os.environ.get('SUPABASE_SECRET_KEY') or os.environ.get('SUPABASE_SERVICE_ROLE_KEY') or os.environ.get('VITE_SUPABASE_ANON_KEY')
 
 HEADERS = {
     "apikey": SUPABASE_KEY,
