@@ -23,6 +23,8 @@ export const Sidebar = () => {
     setShowOnlyOpen,
     showOnlyUpdatedToday,
     setShowOnlyUpdatedToday,
+    showOnlyFavorites,
+    setShowOnlyFavorites,
     setIsSidebarOpen,
     user,
     signOut,
@@ -459,6 +461,24 @@ export const Sidebar = () => {
                 onChange={(e) => setShowOnlyUpdatedToday(e.target.checked)}
               />
               <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+            </div>
+          </label>
+
+          <label className="flex items-center justify-between p-3.5 bg-slate-50 border-2 border-slate-100 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors group">
+            <div className="flex flex-col">
+              <span className="text-sm font-bold text-slate-700 flex items-center gap-1.5">
+                Solo favoritas
+              </span>
+              <span className="text-[10px] text-slate-400 font-medium">Mostrar solo estaciones guardadas</span>
+            </div>
+            <div className="relative inline-flex items-center cursor-pointer">
+              <input 
+                type="checkbox" 
+                className="sr-only peer" 
+                checked={showOnlyFavorites}
+                onChange={(e) => setShowOnlyFavorites(e.target.checked)}
+              />
+              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-500"></div>
             </div>
           </label>
         </section>

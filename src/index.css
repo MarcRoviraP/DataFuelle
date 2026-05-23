@@ -166,3 +166,19 @@
   border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
   margin: 8px -16px !important;
 }
+
+/* Animated route line flowing dash effect */
+.leaflet-interactive.animate-route-flow {
+  stroke-dasharray: 10, 15;
+  animation: route-flow-animation 15s linear infinite;
+}
+
+@keyframes route-flow-animation {
+  from {
+    stroke-dashoffset: 300;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+

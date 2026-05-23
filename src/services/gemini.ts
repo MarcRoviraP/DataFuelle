@@ -10,7 +10,9 @@ export const getGeminiAdvice = async (
   precioActual: number, 
   precioPrediccion: number,
   estacionNombre: string,
-  estacionDireccion: string
+  estacionDireccion: string,
+  carModel?: string,
+  carConsumo?: number
 ): Promise<string> => {
   if (!genAI) {
     console.error('❌ [Gemini] VITE_GEMINI_API_KEY no configurada en el .env');
@@ -28,14 +30,20 @@ export const getGeminiAdvice = async (
     return num.toFixed(3).replace('.', ',');
   };
 
+  let carInfoContext = "";
+  if (carModel && carConsumo) {
+    carInfoContext = `- Vehículo del usuario: ${carModel} (Consumo promedio: ${carConsumo.toFixed(1).replace('.', ',')} L/100km)\n`;
+  }
+
   const prompt = `Actua como un experto en ahorro de combustible. 
   Contexto:
   - Población: ${poblacion}
   - Precio promedio actual en la zona: ${formatPrice(precioActual)}€/L
   - Precio predicho para la semana próxima: ${formatPrice(precioPrediccion)}€/L
   - Estación RECOMENDADA hoy: ${estacionNombre} ubicada en ${estacionDireccion}.
+  ${carInfoContext}
 
-  Escribe un único consejo muy corto, amigable y directo. Menciona la estación recomendada si es una buena opción para ahorrar incluye precios de hoy y predichos y la estación recomendada en el consejo gracioso. Máximo 30 palabras.`;
+  Escribe un único consejo muy corto, amigable y directo. Menciona la estación recomendada si es una buena opción para ahorrar incluye precios de hoy y predichos y la estación recomendada en el consejo gracioso. Si se proporciona el vehículo del usuario, haz una alusión ingeniosa a su consumo promedio o estima de forma divertida cuánto va a ahorrar con ese ${carModel || 'coche'}. Máximo 35 palabras.`;
 
   const MAX_RETRIES = 3;
   let attempt = 0;

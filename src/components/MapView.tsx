@@ -1,4 +1,4 @@
-import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents, LayersControl, ZoomControl, Circle } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents, LayersControl, ZoomControl, Circle, Polyline } from 'react-leaflet'
 import MarkerClusterGroup from 'react-leaflet-cluster'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
@@ -149,7 +149,7 @@ const fmt = (v: number | null | undefined) =>
   v && v > 0 ? `${v.toFixed(3)} €/L` : '—'
 
 export const MapView = () => {
-  const { filteredStations, currentLocation, selectedFuelTypeId, selectedStationId, stationDiscounts, radius, isLoading } = useAppStore()
+  const { filteredStations, currentLocation, selectedFuelTypeId, selectedStationId, stationDiscounts, radius, isLoading, favoriteStationIds, routeCoordinates, routeInfo, clearRoute } = useAppStore()
   const [visualRadius, setVisualRadius] = useState<number>(0)
   const defaultCenter: [number, number] = [39.4699, -0.3763]
   const markerRefs = useRef<Map<number, L.Marker>>(new Map())
@@ -390,6 +390,39 @@ export const MapView = () => {
           </>
         )}
 
+        {routeCoordinates && (
+          <>
+            {/* Capa de brillo neón / sombra */}
+            <Polyline
+              positions={routeCoordinates}
+              pathOptions={{
+                color: '#3b82f6',
+                weight: 8,
+                opacity: 0.3,
+                lineCap: 'round',
+                lineJoin: 'round',
+              }}
+            />
+            {/* Capa precisa y animada con guiones en movimiento */}
+            <Polyline
+              positions={routeCoordinates}
+              pathOptions={{
+                color: '#2563eb',
+                weight: 4,
+                opacity: 0.95,
+                lineCap: 'round',
+                lineJoin: 'round',
+              }}
+              eventHandlers={{
+                add: (e) => {
+                  const el = e.target.getElement()
+                  if (el) el.classList.add('animate-route-flow')
+                }
+              }}
+            />
+          </>
+        )}
+
         <MarkerClusterGroup
           chunkedLoading={true}
           chunkInterval={100} // Process markers in smaller chunks
@@ -418,12 +451,47 @@ export const MapView = () => {
               <Popup minWidth={200}>
                 {/* ... existing popup content ... */}
                 <div style={{ padding: '4px 2px', minWidth: 200 }}>
-                  <h4 style={{
-                    fontWeight: 600, fontSize: 13, color: '#0f172a',
-                    borderBottom: '1px solid #e2e8f0', paddingBottom: 6, marginBottom: 8
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    borderBottom: '1px solid #e2e8f0',
+                    paddingBottom: 6,
+                    marginBottom: 8,
+                    gap: 8
                   }}>
-                    {station.nombreEstacion}
-                  </h4>
+                    <h4 style={{
+                      fontWeight: 600, fontSize: 13, color: '#0f172a',
+                      margin: 0,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      flex: 1
+                    }}>
+                      {station.nombreEstacion}
+                    </h4>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        useAppStore.getState().toggleFavorite(station.idEstacion)
+                      }}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: 2,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: favoriteStationIds.includes(station.idEstacion) ? '#ef4444' : '#94a3b8'
+                      }}
+                      title={favoriteStationIds.includes(station.idEstacion) ? "Quitar de favoritos" : "Guardar en favoritos"}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill={favoriteStationIds.includes(station.idEstacion) ? "#ef4444" : "none"} stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'all 0.2s' }}>
+                        <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
+                      </svg>
+                    </button>
+                  </div>
 
                   {/* 3 fuel prices */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 8 }}>
@@ -499,6 +567,34 @@ export const MapView = () => {
                     )}
                   </div>
 
+                  <button
+                    onClick={async () => {
+                      const store = useAppStore.getState()
+                      await store.fetchRoute(station.idEstacion, station.latitud, station.longitud)
+                      const marker = markerRefs.current.get(station.idEstacion)
+                      if (marker) marker.closePopup()
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                      width: '100%',
+                      padding: '10px',
+                      background: '#2563eb',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: 8,
+                      fontSize: 12,
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 12px rgba(37,99,235,0.3)',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    📍 Trazar ruta en la app
+                  </button>
+
                   <a
                     href={`https://www.google.com/maps/dir/?api=1&destination=${station.latitud},${station.longitud}`}
                     target="_blank"
@@ -507,19 +603,18 @@ export const MapView = () => {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: 8,
+                      gap: 6,
                       width: '100%',
-                      padding: '8px',
-                      background: '#2563eb',
-                      color: 'white',
-                      borderRadius: 8,
-                      fontSize: 12,
-                      fontWeight: 700,
+                      marginTop: 6,
+                      padding: '6px',
+                      background: 'transparent',
+                      color: '#64748b',
+                      fontSize: 11,
+                      fontWeight: 600,
                       textDecoration: 'none',
-                      boxShadow: '0 2px 4px rgba(37,99,235,0.2)'
                     }}
                   >
-                    Fijar ruta en Google Maps
+                    ↗️ Abrir en Google Maps externo
                   </a>
 
                   <button
@@ -553,6 +648,44 @@ export const MapView = () => {
           )), [filteredStations, selectedStationId, selectedFuelTypeId, stationDiscounts])}
         </MarkerClusterGroup>
       </MapContainer>
+
+      {routeCoordinates && routeInfo && (
+        <div 
+          className="absolute top-4 left-4 z-[999] bg-slate-900/90 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-4 shadow-2xl text-white flex flex-col gap-3 min-w-[240px] animate-fade-in"
+          style={{ pointerEvents: 'auto' }}
+        >
+          <div className="flex justify-between items-start gap-4">
+            <div>
+              <span className="text-[10px] text-blue-400 font-bold uppercase tracking-wider">Ruta Activa</span>
+              <h3 className="font-extrabold text-base text-slate-100 mt-0.5">Cómo llegar</h3>
+            </div>
+            <button 
+              onClick={clearRoute}
+              className="text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-800 p-1.5 rounded-lg border border-slate-700/50 transition-colors cursor-pointer"
+              title="Cerrar ruta"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-4 border-t border-slate-800 pt-3">
+            <div>
+              <span className="text-[9px] text-slate-400 font-semibold uppercase">Distancia</span>
+              <p className="font-black text-lg text-blue-400">
+                {(routeInfo.distance / 1000).toFixed(1)} <span className="text-xs font-bold text-slate-300">km</span>
+              </p>
+            </div>
+            <div>
+              <span className="text-[9px] text-slate-400 font-semibold uppercase">Duración</span>
+              <p className="font-black text-lg text-emerald-400">
+                {Math.round(routeInfo.duration / 60)} <span className="text-xs font-bold text-slate-300">min</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
