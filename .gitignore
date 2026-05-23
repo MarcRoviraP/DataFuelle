@@ -54,3 +54,4 @@ models/
 data/*.parquet
 scratch/
 fuel_prices*.parquet
+bfg.jar
