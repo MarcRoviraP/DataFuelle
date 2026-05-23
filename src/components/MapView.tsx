@@ -1,4 +1,4 @@
-import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents, LayersControl, ZoomControl, Circle, Polyline } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents, LayersControl, ZoomControl, Circle, Polyline, LayerGroup } from 'react-leaflet'
 import MarkerClusterGroup from 'react-leaflet-cluster'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
@@ -344,10 +344,15 @@ export const MapView = () => {
             />
           </BaseLayer>
           <BaseLayer name="Satélite">
-            <TileLayer
-              attribution='&copy; CNES, Distribution Airbus DS, © Airbus DS, © PlanetObserver (Contains Copernicus Data) | &copy; <a href="https://www.stadiamaps.com/" target="_blank">Stadia Maps</a> &copy; <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              url={`https://tiles.stadiamaps.com/tiles/alidade_satellite/{z}/{x}/{y}{r}.jpg${import.meta.env.VITE_STADIA_API_KEY ? `?api_key=${import.meta.env.VITE_STADIA_API_KEY}` : ''}`}
-            />
+            <LayerGroup>
+              <TileLayer
+                attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+              />
+              <TileLayer
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
+              />
+            </LayerGroup>
           </BaseLayer>
         </LayersControl>
         <MapController center={currentLocation} />
@@ -624,7 +629,6 @@ export const MapView = () => {
                       store.setSelectedStationId(station.idEstacion)
                     }}
                     style={{
-                      display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: 6,
@@ -639,13 +643,14 @@ export const MapView = () => {
                       fontWeight: 700,
                       cursor: 'pointer',
                     }}
+                    className="flex lg:hidden"
                   >
                     📋 Ver en lista
                   </button>
                 </div>
               </Popup>
             </Marker>
-          )), [filteredStations, selectedStationId, selectedFuelTypeId, stationDiscounts])}
+          )), [filteredStations, selectedStationId, selectedFuelTypeId, stationDiscounts, favoriteStationIds])}
         </MarkerClusterGroup>
       </MapContainer>
 

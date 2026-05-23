@@ -10,8 +10,12 @@ interface CarSelectorProps {
 
 export const CarSelector = ({ onClose }: CarSelectorProps) => {
   const { addUserCar } = useAppStore()
-  const [step, setStep] = useState<'make' | 'model'>('make')
+  const [step, setStep] = useState<'make' | 'model' | 'custom'>('make')
   const [makes, setMakes] = useState<string[]>([])
+  
+  const [customMake, setCustomMake] = useState('')
+  const [customModel, setCustomModel] = useState('')
+  const [customConsumo, setCustomConsumo] = useState('')
   const [models, setModels] = useState<Car[]>([])
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
@@ -105,7 +109,7 @@ export const CarSelector = ({ onClose }: CarSelectorProps) => {
           <div>
             <h3 className="text-xl font-black text-slate-900">Añadir Vehículo</h3>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-tighter">
-              {step === 'make' ? 'Paso 1: Selecciona la marca' : `Paso 2: Modelos de ${selectedMake}`}
+              {step === 'custom' ? 'Introduce los datos' : step === 'make' ? 'Paso 1: Selecciona la marca' : `Paso 2: Modelos de ${selectedMake}`}
             </p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-xl transition-colors">
@@ -114,19 +118,21 @@ export const CarSelector = ({ onClose }: CarSelectorProps) => {
         </div>
 
         {/* Search */}
-        <div className="p-4 bg-white">
-          <div className="relative group">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={18} />
-            <input
-              type="text"
-              placeholder={step === 'make' ? "Buscar marca..." : "Buscar modelo..."}
-              className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:outline-none focus:border-blue-500 transition-all font-semibold"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              autoFocus
-            />
+        {step !== 'custom' && (
+          <div className="p-4 bg-white">
+            <div className="relative group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={18} />
+              <input
+                type="text"
+                placeholder={step === 'make' ? "Buscar marca..." : "Buscar modelo..."}
+                className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:outline-none focus:border-blue-500 transition-all font-semibold"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                autoFocus
+              />
+            </div>
           </div>
-        </div>
+        )}
 
         {/* List */}
         <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
@@ -152,6 +158,76 @@ export const CarSelector = ({ onClose }: CarSelectorProps) => {
                   <ChevronRight size={18} className="text-slate-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" />
                 </button>
               ))}
+              
+              <button
+                onClick={() => setStep('custom')}
+                className="mt-2 p-4 text-sm font-bold text-slate-500 bg-slate-50 hover:bg-slate-100 rounded-2xl transition-all flex items-center justify-center gap-2 w-full border-2 border-dashed border-slate-200"
+              >
+                ¿No encuentras tu coche? Añadir manualmente
+              </button>
+            </div>
+          ) : step === 'custom' ? (
+            <div className="flex flex-col gap-4 p-4">
+              <button 
+                onClick={() => setStep('make')}
+                className="mb-2 p-3 text-xs font-black text-blue-600 hover:bg-blue-50 rounded-xl transition-all flex items-center gap-2 uppercase w-max"
+              >
+                ← Volver
+              </button>
+              
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Marca</label>
+                <input 
+                  type="text" 
+                  value={customMake}
+                  onChange={(e) => setCustomMake(e.target.value)}
+                  placeholder="Ej: Toyota"
+                  className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-blue-500 focus:outline-none font-semibold transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Modelo</label>
+                <input 
+                  type="text" 
+                  value={customModel}
+                  onChange={(e) => setCustomModel(e.target.value)}
+                  placeholder="Ej: Corolla"
+                  className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-blue-500 focus:outline-none font-semibold transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Consumo medio (L/100km)</label>
+                <input 
+                  type="number" 
+                  step="0.1"
+                  value={customConsumo}
+                  onChange={(e) => setCustomConsumo(e.target.value)}
+                  placeholder="Ej: 5.5"
+                  className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-blue-500 focus:outline-none font-semibold transition-colors"
+                />
+              </div>
+
+              <button
+                onClick={() => {
+                  if (customMake && customModel && customConsumo) {
+                    const car: Car = {
+                      id: Date.now(),
+                      make: customMake,
+                      model: customModel,
+                      year: new Date().getFullYear(),
+                      combustible: 'Personalizado',
+                      consumo_l_100km: parseFloat(customConsumo)
+                    }
+                    handleSelectCar(car)
+                  }
+                }}
+                disabled={!customMake || !customModel || !customConsumo}
+                className="mt-2 p-4 text-sm font-black text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:bg-slate-300 rounded-2xl transition-all flex items-center justify-center"
+              >
+                Guardar vehículo manual
+              </button>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-1">

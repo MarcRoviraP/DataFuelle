@@ -8,7 +8,7 @@ import { supabase } from '../services/supabaseClient'
 let syncTimeout: any = null
 
 export interface Car {
-  id: number
+  id: number | string
   make: string
   model: string
   year: number
@@ -77,11 +77,11 @@ interface AppState {
   
   // Cars (Garage)
   userCars: Car[]
-  selectedCarId: number | null
+  selectedCarId: number | string | null
   fetchUserCars: () => Promise<void>
   addUserCar: (car: Car) => Promise<void>
-  removeUserCar: (carId: number) => Promise<void>
-  setSelectedCarId: (id: number | null) => Promise<void>
+  removeUserCar: (carId: number | string) => Promise<void>
+  setSelectedCarId: (id: number | string | null) => Promise<void>
 
   // Favorites
   favoriteStationIds: number[]
@@ -355,7 +355,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       const { data, error } = await supabase
         .from('user_cars')
         .select(`
+          id,
           is_default,
+          custom_make,
+          custom_model,
+          custom_consumo,
           car:cars (*)
         `)
         .eq('user_id', user.id)
@@ -363,10 +367,24 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (error) throw error
 
       if (data) {
-        const cars = data.map((d: any) => ({
-          ...d.car,
-          is_default: d.is_default
-        }))
+        const cars = data.map((d: any) => {
+          if (d.car) {
+            return {
+              ...d.car,
+              is_default: d.is_default
+            }
+          } else {
+            return {
+              id: d.id,
+              make: d.custom_make || 'Personalizado',
+              model: d.custom_model || 'Coche manual',
+              year: new Date().getFullYear(),
+              combustible: 'Personalizado',
+              consumo_l_100km: d.custom_consumo || 0,
+              is_default: d.is_default
+            }
+          }
+        })
         const defaultCar = cars.find(c => c.is_default)
         set({ 
           userCars: cars,
@@ -385,12 +403,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     
     try {
       const isFirst = userCars.length === 0
+      const isCustom = typeof car.id === 'string' || car.id > 1000000000
+      
       const { error } = await supabase
         .from('user_cars')
         .insert({
           user_id: user.id,
-          car_id: car.id,
-          is_default: isFirst
+          car_id: isCustom ? null : car.id,
+          is_default: isFirst,
+          custom_make: isCustom ? car.make : null,
+          custom_model: isCustom ? car.model : null,
+          custom_consumo: isCustom ? car.consumo_l_100km : null
         })
 
       if (error) throw error
@@ -406,11 +429,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!user) return
 
     try {
-      const { error } = await supabase
+      const isCustom = typeof carId === 'string'
+      let query = supabase
         .from('user_cars')
         .delete()
         .eq('user_id', user.id)
-        .eq('car_id', carId)
+        
+      if (isCustom) query = query.eq('id', carId)
+      else query = query.eq('car_id', carId)
+
+      const { error } = await query
 
       if (error) throw error
       await get().fetchUserCars()
@@ -432,11 +460,16 @@ export const useAppStore = create<AppState>((set, get) => ({
         .eq('user_id', user.id)
 
       if (id) {
-        await supabase
+        const isCustom = typeof id === 'string'
+        let query = supabase
           .from('user_cars')
           .update({ is_default: true })
           .eq('user_id', user.id)
-          .eq('car_id', id)
+          
+        if (isCustom) query = query.eq('id', id)
+        else query = query.eq('car_id', id)
+        
+        await query
       }
 
       await get().fetchUserCars()
