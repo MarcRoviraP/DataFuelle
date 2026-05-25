@@ -1,13 +1,16 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Sidebar } from './components/Sidebar'
 import { StationList } from './components/StationList'
 import { MapView } from './components/MapView'
 import { useAppStore } from './store/useAppStore'
-import { X, Map as MapIcon, List } from 'lucide-react'
+import { X, Map as MapIcon, List, BookOpen } from 'lucide-react'
 import { Menu } from 'lucide-react'
 import { AuthScreen } from './components/AuthScreen'
+import { DocuScreen } from './components/DocuScreen'
 
 function App() {
+  const [currentPath, setCurrentPath] = useState(window.location.pathname)
+
   const { 
     isSidebarOpen, 
     setIsSidebarOpen, 
@@ -19,6 +22,14 @@ function App() {
     isAuthScreenOpen
   } = useAppStore()
   const selectedFuelName = fuelTypes.find(f => f.idFuelType === selectedFuelTypeId)?.fuelTypeName || 'Combustible'
+
+  useEffect(() => {
+    const handleLocationChange = () => {
+      setCurrentPath(window.location.pathname)
+    }
+    window.addEventListener('popstate', handleLocationChange)
+    return () => window.removeEventListener('popstate', handleLocationChange)
+  }, [])
 
   useEffect(() => {
     const store = useAppStore.getState()
@@ -46,15 +57,33 @@ function App() {
     }
   }, [setCurrentLocation])
 
+  if (currentPath === '/docu') {
+    return <DocuScreen />
+  }
+
   return (
     <div className="flex h-[100dvh] w-screen bg-slate-100 overflow-hidden font-sans text-slate-800 antialiased relative">
       {!isAuthScreenOpen && (
-        <button 
-          onClick={() => setIsSidebarOpen(true)}
-          className="lg:hidden fixed top-6 left-4 z-[1000] p-3 bg-white/80 backdrop-blur-xl border border-white/40 rounded-2xl shadow-xl text-slate-600 hover:bg-white transition-all active:scale-95"
-        >
-          <Menu size={24} />
-        </button>
+        <>
+          <button 
+            onClick={() => setIsSidebarOpen(true)}
+            className="lg:hidden fixed top-6 left-4 z-[1000] p-3 bg-white/80 backdrop-blur-xl border border-white/40 rounded-2xl shadow-xl text-slate-600 hover:bg-white transition-all active:scale-95"
+          >
+            <Menu size={24} />
+          </button>
+          
+          <button 
+            onClick={() => {
+              window.history.pushState({}, '', '/docu')
+              const navEvent = new PopStateEvent('popstate')
+              window.dispatchEvent(navEvent)
+            }}
+            className="lg:hidden fixed top-6 right-4 z-[1000] p-3 bg-white/80 backdrop-blur-xl border border-white/40 rounded-2xl shadow-xl text-slate-600 hover:bg-white transition-all active:scale-95"
+            title="Documentación"
+          >
+            <BookOpen size={24} />
+          </button>
+        </>
       )}
 
       {isAuthScreenOpen && <AuthScreen />}
