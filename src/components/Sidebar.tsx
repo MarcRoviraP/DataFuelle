@@ -42,15 +42,7 @@ export const Sidebar = () => {
   const [showSuggestions, setShowSuggestions] = useState(false)
   const debounceRef = useRef<number | null>(null)
 
-  const navigateTo = (path: string) => {
-    window.history.pushState({}, '', path)
-    const navEvent = new PopStateEvent('popstate')
-    window.dispatchEvent(navEvent)
-    
-    if (window.innerWidth < 1024) {
-      setIsSidebarOpen(false)
-    }
-  }
+
 
   const selectedCar = useMemo(() => userCars.find(c => c.id === selectedCarId), [userCars, selectedCarId])
 
