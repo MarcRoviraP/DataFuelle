@@ -50,6 +50,7 @@ const MapEvents = () => {
   const setCurrentLocation = useAppStore(state => state.setCurrentLocation)
   const setSelectedStationId = useAppStore(state => state.setSelectedStationId)
   const selectedStationId = useAppStore(state => state.selectedStationId)
+  const map = useMap()
 
   useMapEvents({
     click(e) {
@@ -60,8 +61,39 @@ const MapEvents = () => {
         // Otherwise, move the search center AND fetch new data
         setCurrentLocation(e.latlng.lat, e.latlng.lng)
         fetchStations()
+
+        try {
+          localStorage.setItem('datafuelle_map_center', JSON.stringify({ lat: e.latlng.lat, lng: e.latlng.lng }))
+        } catch (err) {
+          console.error(err)
+        }
       }
     },
+    moveend() {
+      const center = map.getCenter()
+      const zoom = map.getZoom()
+      try {
+        localStorage.setItem('datafuelle_map_center', JSON.stringify({ lat: center.lat, lng: center.lng }))
+        localStorage.setItem('datafuelle_map_zoom', zoom.toString())
+      } catch (err) {
+        console.error(err)
+      }
+    },
+    zoomend() {
+      const zoom = map.getZoom()
+      try {
+        localStorage.setItem('datafuelle_map_zoom', zoom.toString())
+      } catch (err) {
+        console.error(err)
+      }
+    },
+    baselayerchange(e) {
+      try {
+        localStorage.setItem('datafuelle_map_layer', e.name)
+      } catch (err) {
+        console.error(err)
+      }
+    }
   })
   return null
 }
@@ -319,11 +351,43 @@ export const MapView = () => {
   // Detect system color scheme preference
   const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
 
+  const [initialCenter] = useState<[number, number]>(() => {
+    try {
+      const stored = localStorage.getItem('datafuelle_map_center')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (parsed && typeof parsed.lat === 'number' && typeof parsed.lng === 'number') {
+          return [parsed.lat, parsed.lng]
+        }
+      }
+    } catch {}
+    return currentLocation ? [currentLocation.lat, currentLocation.lon] : defaultCenter
+  })
+
+  const [initialZoom] = useState<number>(() => {
+    try {
+      const stored = localStorage.getItem('datafuelle_map_zoom')
+      if (stored) {
+        const parsed = parseInt(stored, 10)
+        if (!isNaN(parsed)) return parsed
+      }
+    } catch {}
+    return 13
+  })
+
+  const [activeLayer] = useState<string>(() => {
+    try {
+      const stored = localStorage.getItem('datafuelle_map_layer')
+      if (stored) return stored
+    } catch {}
+    return prefersDark ? 'Oscuro' : 'Callejero'
+  })
+
   return (
     <div className="w-full h-full relative group">
       <MapContainer
-        center={currentLocation ? [currentLocation.lat, currentLocation.lon] : defaultCenter}
-        zoom={13}
+        center={initialCenter}
+        zoom={initialZoom}
         className="w-full h-full"
         attributionControl={false}
         zoomControl={false}
@@ -331,19 +395,19 @@ export const MapView = () => {
       >
         <ZoomControl position="bottomright" />
         <LayersControl position="topright">
-          <BaseLayer checked={!prefersDark} name="Callejero">
+          <BaseLayer checked={activeLayer === 'Callejero'} name="Callejero">
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
               url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
             />
           </BaseLayer>
-          <BaseLayer checked={prefersDark} name="Oscuro">
+          <BaseLayer checked={activeLayer === 'Oscuro'} name="Oscuro">
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
               url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
             />
           </BaseLayer>
-          <BaseLayer name="Satélite">
+          <BaseLayer checked={activeLayer === 'Satélite'} name="Satélite">
             <LayerGroup>
               <TileLayer
                 attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'

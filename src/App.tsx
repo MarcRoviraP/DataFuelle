@@ -40,8 +40,9 @@ function App() {
       store.fetchStations()
     }
 
-    // 2. Try to get real location
-    if (navigator.geolocation) {
+    // 2. Try to get real location ONLY if there is no previously saved location
+    const hasSavedLocation = !!localStorage.getItem('datafuelle_current_location')
+    if (!hasSavedLocation && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords

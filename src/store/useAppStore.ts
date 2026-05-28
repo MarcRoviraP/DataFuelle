@@ -108,9 +108,23 @@ export const useAppStore = create<AppState>((set, get) => ({
   setIsSidebarOpen: (isOpen) => set({ isSidebarOpen: isOpen }),
   viewMode: 'map',
   setViewMode: (mode) => set({ viewMode: mode }),
-  currentLocation: { lat: 39.4699, lon: -0.3763 },
+  currentLocation: (() => {
+    try {
+      const stored = localStorage.getItem('datafuelle_current_location')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (parsed && typeof parsed.lat === 'number' && typeof parsed.lon === 'number') {
+          return { lat: parsed.lat, lon: parsed.lon }
+        }
+      }
+    } catch {}
+    return { lat: 39.4699, lon: -0.3763 }
+  })(),
   setCurrentLocation: (lat, lon) => {
     set({ currentLocation: { lat, lon } })
+    try {
+      localStorage.setItem('datafuelle_current_location', JSON.stringify({ lat, lon }))
+    } catch {}
   },
   stationDiscounts: new Map(),
   setStationDiscount: (stationId, discount) => {
@@ -637,6 +651,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       console.log('✅ [Auth] Supabase sign out call successful')
       
       console.log('💾 [Auth] Resetting store state...')
+      try {
+        localStorage.removeItem('datafuelle_map_center')
+        localStorage.removeItem('datafuelle_map_zoom')
+        localStorage.removeItem('datafuelle_map_layer')
+        localStorage.removeItem('datafuelle_current_location')
+      } catch {}
+
       set({ 
         user: null, 
         searchHistory: [], 
