@@ -15,3 +15,8 @@
   schedule = "0 0,12 * * *"
 [functions."predict_prices_cron_background"]
   schedule = "0 0 * * 1"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
