@@ -3,6 +3,7 @@ import { useAppStore } from '../store/useAppStore'
 import { fetchSuggestions, geocodeAddress } from '../utils/geo'
 import { Search, MapPin, Fuel, Navigation, History, Filter, X, Tag, LogIn, LogOut, Zap, ArrowUpDown, Car } from 'lucide-react'
 import { Garage } from './Garage'
+import { SmartPrediction } from './SmartPrediction'
 
 export const Sidebar = () => {
   const {
@@ -523,6 +524,9 @@ export const Sidebar = () => {
             </div>
           </label>
         </section>
+
+        {/* Predicción Inteligente */}
+        <SmartPrediction />
 
         {/* Brands Section */}
         <section className="space-y-4 pt-2 border-t border-slate-100">
