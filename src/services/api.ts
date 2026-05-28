@@ -151,10 +151,58 @@ let isMitecoHealthy = true
 let lastHealthCheck = 0
 let isCheckingHealth = false
 
+const getPersistedMitecoCache = async (): Promise<any[] | null> => {
+  try {
+    if (typeof caches === 'undefined') return null
+    const cache = await caches.open('datafuelle-miteco-cache')
+    const cachedResponse = await cache.match(MITECO_URL)
+    if (cachedResponse) {
+      const cachedTimestamp = localStorage.getItem('datafuelle_miteco_timestamp')
+      if (cachedTimestamp) {
+        const timestamp = parseInt(cachedTimestamp, 10)
+        const now = Date.now()
+        if (!isNaN(timestamp) && (now - timestamp) < CACHE_DURATION) {
+          const data = await cachedResponse.json()
+          if (Array.isArray(data) && data.length > 0) {
+            return data
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('⚠️ [MITECO Cache] Error al leer de la caché persistente del navegador:', err)
+  }
+  return null
+}
+
+const persistMitecoCache = async (data: any[]) => {
+  try {
+    if (typeof caches === 'undefined') return
+    const cache = await caches.open('datafuelle-miteco-cache')
+    await cache.put(MITECO_URL, new Response(JSON.stringify(data), {
+      headers: { 'Content-Type': 'application/json' }
+    }))
+    localStorage.setItem('datafuelle_miteco_timestamp', Date.now().toString())
+  } catch (err) {
+    console.warn('⚠️ [MITECO Cache] Error al escribir en la caché persistente del navegador:', err)
+  }
+}
+
 export const prefetchMitecoData = async (force = false): Promise<any[]> => {
   const now = Date.now()
+  
   if (!force && mitecoCache && (now - mitecoCache.timestamp) < CACHE_DURATION) {
     return mitecoCache.data
+  }
+
+  if (!force) {
+    const persistedData = await getPersistedMitecoCache()
+    if (persistedData) {
+      const cachedTimestamp = parseInt(localStorage.getItem('datafuelle_miteco_timestamp') || '0', 10)
+      mitecoCache = { data: persistedData, timestamp: cachedTimestamp }
+      console.log(`📡 [MITECO Prefetch] ¡Éxito! ${persistedData.length} gasolineras recuperadas de la caché persistente del navegador.`)
+      return persistedData
+    }
   }
 
   if (isCheckingHealth) {
@@ -163,11 +211,11 @@ export const prefetchMitecoData = async (force = false): Promise<any[]> => {
   }
   
   isCheckingHealth = true
-  console.log('📡 [MITECO Prefetch] Precargando todas las gasolineras de España en segundo plano para cachear en memoria...')
+  console.log('📡 [MITECO Prefetch] Precargando todas las gasolineras de España desde red para renovar caché...')
   
   pendingMitecoFetch = (async () => {
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 12000) // 12s para descargar el listado completo
+    const timeoutId = setTimeout(() => controller.abort(), 12000)
 
     try {
       const response = await fetch(MITECO_URL, { signal: controller.signal })
@@ -179,12 +227,24 @@ export const prefetchMitecoData = async (force = false): Promise<any[]> => {
       const data = json.ListaEESSPrecio || []
       
       mitecoCache = { data, timestamp: Date.now() }
+      await persistMitecoCache(data)
+      
       isMitecoHealthy = true
-      console.log(`📡 [MITECO Prefetch] ¡Éxito! ${data.length} gasolineras precargadas en caché de memoria.`)
+      console.log(`📡 [MITECO Prefetch] ¡Éxito! ${data.length} gasolineras precargadas y guardadas en la caché persistente del navegador.`)
       return data
     } catch (err) {
       clearTimeout(timeoutId)
-      console.error('❌ [MITECO Prefetch Error] No se pudo descargar la base de datos de MITECO en segundo plano:', err)
+      console.error('❌ [MITECO Prefetch Error] No se pudo descargar la base de datos de MITECO desde red:', err)
+      
+      // Fallback a caché vieja si la red falló
+      const fallbackData = await getPersistedMitecoCache()
+      if (fallbackData) {
+        console.warn('⚠️ [MITECO Prefetch Fallback] Usando caché persistente anterior ante fallo de red.')
+        mitecoCache = { data: fallbackData, timestamp: now }
+        isMitecoHealthy = true
+        return fallbackData
+      }
+      
       isMitecoHealthy = false
       return []
     } finally {
@@ -199,7 +259,7 @@ export const prefetchMitecoData = async (force = false): Promise<any[]> => {
 
 export const checkMitecoHealthStatus = async (force = false): Promise<boolean> => {
   if (force || (Date.now() - lastHealthCheck) > CACHE_DURATION) {
-    await prefetchMitecoData(true)
+    await prefetchMitecoData(force)
   }
   return isMitecoHealthy
 }
@@ -209,8 +269,8 @@ setInterval(async () => {
   await prefetchMitecoData(true)
 }, CACHE_DURATION)
 
-// Arrancamos la precarga completa en segundo plano inmediatamente al importar el módulo
-prefetchMitecoData(true)
+// Arrancamos la precarga completa en segundo plano de forma no forzada para priorizar la caché persistente existente
+prefetchMitecoData(false)
 
 export const fetchStationsByRadius = async (
   latitud: number,
