@@ -3,7 +3,6 @@ import { useAppStore } from '../store/useAppStore'
 import { fetchSuggestions, geocodeAddress } from '../utils/geo'
 import { Search, MapPin, Fuel, Navigation, History, Filter, X, Tag, LogIn, LogOut, Zap, ArrowUpDown, Car } from 'lucide-react'
 import { Garage } from './Garage'
-import { SmartPrediction } from './SmartPrediction'
 
 export const Sidebar = () => {
   const {
@@ -42,6 +41,16 @@ export const Sidebar = () => {
   const [suggestions, setSuggestions] = useState<any[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const debounceRef = useRef<number | null>(null)
+
+  const navigateTo = (path: string) => {
+    window.history.pushState({}, '', path)
+    const navEvent = new PopStateEvent('popstate')
+    window.dispatchEvent(navEvent)
+    
+    if (window.innerWidth < 1024) {
+      setIsSidebarOpen(false)
+    }
+  }
 
   const selectedCar = useMemo(() => userCars.find(c => c.id === selectedCarId), [userCars, selectedCarId])
 
@@ -335,9 +344,6 @@ export const Sidebar = () => {
           </section>
         )}
 
-        {/* Smart Prediction Section */}
-        <SmartPrediction />
-
         {/* Fuel Type Section */}
         <section className="space-y-4 pt-2 border-t border-slate-100">
           <div className="flex items-center gap-2 text-slate-800 font-bold px-1 border-l-4 border-blue-500">
@@ -571,7 +577,7 @@ export const Sidebar = () => {
 
         {/* History Section */}
         {searchHistory.length > 0 && (
-          <section className="space-y-4 pt-2 border-t border-slate-100 pb-12">
+          <section className="space-y-4 pt-2 border-t border-slate-100">
             <div className="flex items-center gap-2 text-slate-800 font-bold px-1 border-l-4 border-blue-500">
               <History size={18} />
               <h2>Búsquedas Recientes</h2>

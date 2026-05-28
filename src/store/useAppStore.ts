@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { Station, FuelType } from '../services/api'
-import { fetchStationsByRadius, fetchRecentPriceChanges } from '../services/api'
+import { fetchStationsByRadius, fetchRecentPriceChanges, fetchStationsByProvinceOrMunicipality } from '../services/api'
 import type { User } from '@supabase/supabase-js'
 import { calculateDistance } from '../utils/geo'
 import { supabase } from '../services/supabaseClient'
@@ -91,6 +91,10 @@ interface AppState {
   showOnlyFavorites: boolean
   setShowOnlyFavorites: (showOnlyFavorites: boolean) => void
 
+  // SEO Local Filtering
+  activeSEOFilter: { provincia: string; municipio?: string } | null
+  setActiveSEOFilter: (filter: { provincia: string; municipio?: string } | null) => void
+
   // Actions
   fetchStations: () => Promise<void>
   updateFilteredStations: () => void
@@ -127,6 +131,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       localStorage.setItem('datafuelle_current_location', JSON.stringify({ lat, lon }))
     } catch {}
+  },
+  activeSEOFilter: null,
+  setActiveSEOFilter: (filter) => {
+    set({ activeSEOFilter: filter })
+    get().fetchStations()
   },
   stationDiscounts: new Map(),
   setStationDiscount: (stationId, discount) => {
@@ -352,19 +361,32 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   fetchStations: async () => {
-    const { currentLocation, radius, selectedFuelTypeId, setIsLoading, setStations, setPriceChanges } = get()
+    const { currentLocation, radius, selectedFuelTypeId, setIsLoading, setStations, setPriceChanges, activeSEOFilter } = get()
     
-    if (!currentLocation) return
+    if (!currentLocation && !activeSEOFilter) return
 
     setIsLoading(true)
     try {
-      const [data, priceChanges] = await Promise.all([
-        fetchStationsByRadius(
-          currentLocation.lat,
-          currentLocation.lon,
+      let stationsPromise;
+      if (activeSEOFilter) {
+        stationsPromise = fetchStationsByProvinceOrMunicipality(
+          activeSEOFilter.provincia,
+          activeSEOFilter.municipio || null,
+          selectedFuelTypeId,
+          currentLocation?.lat,
+          currentLocation?.lon
+        )
+      } else {
+        stationsPromise = fetchStationsByRadius(
+          currentLocation!.lat,
+          currentLocation!.lon,
           radius,
           selectedFuelTypeId
-        ),
+        )
+      }
+
+      const [data, priceChanges] = await Promise.all([
+        stationsPromise,
         fetchRecentPriceChanges(selectedFuelTypeId)
       ])
       
@@ -513,12 +535,26 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   updateFilteredStations: () => {
-    const { stations, radius, selectedBrands, sortBy, showOnlyOpen, showOnlyUpdatedToday, stationDiscounts, userCars, selectedCarId, showOnlyFavorites, favoriteStationIds, refuelLiters } = get()
+    const { stations, radius, selectedBrands, sortBy, showOnlyOpen, showOnlyUpdatedToday, stationDiscounts, userCars, selectedCarId, showOnlyFavorites, favoriteStationIds, refuelLiters, activeSEOFilter } = get()
     
     let filtered = stations.map(s => ({
       ...s,
       precioCombustible: (s.precioBase || 0) - (stationDiscounts.get(s.idEstacion) || 0)
-    })).filter(s => (s.distancia || 0) <= radius && (s.precioBase || 0) > 0)
+    })).filter(s => (s.precioBase || 0) > 0)
+
+    if (activeSEOFilter) {
+      const { provincia, municipio } = activeSEOFilter
+      filtered = filtered.filter(s => {
+        const provMatch = s.provincia?.toLowerCase().trim() === provincia.toLowerCase().trim()
+        if (!provMatch) return false
+        if (municipio) {
+          return s.municipio?.toLowerCase().trim() === municipio.toLowerCase().trim()
+        }
+        return true
+      })
+    } else {
+      filtered = filtered.filter(s => (s.distancia || 0) <= radius)
+    }
 
     // Filter by Brand
     if (selectedBrands.length > 0) {

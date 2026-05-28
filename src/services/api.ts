@@ -490,3 +490,130 @@ export const fetchPredictions = async (_idFuelType: number, stationIds?: number[
 
   return data || [];
 }
+
+export const fetchStationsFromSupabaseBackupByRegion = async (
+  provincia: string,
+  municipio: string | null,
+  idFuelType: number,
+  userLat?: number,
+  userLon?: number
+): Promise<Station[]> => {
+  try {
+    let query = supabase
+      .from('stations')
+      .select('*')
+      .ilike('province', provincia)
+      
+    if (municipio) {
+      query = query.ilike('municipality', municipio)
+    }
+    
+    const { data, error } = await query
+    if (error) throw error
+    if (!data || data.length === 0) return []
+
+    const fuelKey = idFuelType === 9 ? 'last_price_95' : 
+                    idFuelType === 12 ? 'last_price_98' : 
+                    'last_price_diesel'
+
+    return data
+      .map((s: any) => {
+        const price = s[fuelKey] || 0
+        const dist = (userLat && userLon) ? calculateDistance(userLat, userLon, s.latitude, s.longitude) : undefined
+        
+        return {
+          idEstacion: s.external_id,
+          nombreEstacion: cleanStationName(s.name || 'Estación sin nombre'),
+          direccion: s.address || '',
+          municipio: s.municipality || '',
+          provincia: s.province || '',
+          latitud: s.latitude,
+          longitud: s.longitude,
+          horario: s.schedule || '',
+          marca: s.brand || '',
+          margen: '',
+          codPostal: s.postal_code || '',
+          precioCombustible: price,
+          precioBase: price,
+          precioG95: s.last_price_95 || null,
+          precioG98: s.last_price_98 || null,
+          precioDiesel: s.last_price_diesel || null,
+          distancia: dist,
+          lastUpdate: s.updated_at || new Date().toISOString()
+        }
+      })
+      .filter(s => s.precioCombustible >= 0.1)
+      .sort((a, b) => {
+        if (a.distancia !== undefined && b.distancia !== undefined) return a.distancia - b.distancia;
+        return a.precioCombustible - b.precioCombustible;
+      })
+  } catch (dbErr) {
+    console.error('❌ [Supabase Region Backup Error] Falló la recuperación:', dbErr)
+    return []
+  }
+}
+
+export const fetchStationsByProvinceOrMunicipality = async (
+  provincia: string,
+  municipio: string | null,
+  idFuelType: number,
+  userLat?: number,
+  userLon?: number
+): Promise<Station[]> => {
+  let rawStations = await prefetchMitecoData()
+  
+  if (rawStations.length === 0) {
+    return fetchStationsFromSupabaseBackupByRegion(provincia, municipio, idFuelType, userLat, userLon)
+  }
+
+  const fuelKey = idFuelType === 9 ? 'Precio Gasolina 95 E5' : 
+                  idFuelType === 12 ? 'Precio Gasolina 98 E5' : 
+                  'Precio Gasoleo A'
+
+  const cleanProvInput = provincia.toLowerCase().trim()
+  const cleanMunInput = municipio ? municipio.toLowerCase().trim() : null
+
+  return rawStations
+    .filter((s: any) => {
+      const sProv = s['Provincia']?.toLowerCase().trim() || ''
+      if (sProv !== cleanProvInput) return false
+      if (cleanMunInput) {
+        const sMun = s['Municipio']?.toLowerCase().trim() || ''
+        return sMun === cleanMunInput
+      }
+      return true
+    })
+    .map((s: any) => {
+      const sLat = parseMitecoNumber(s['Latitud'])
+      const sLon = parseMitecoNumber(s['Longitud (WGS84)'])
+      const dist = (userLat && userLon) ? calculateDistance(userLat, userLon, sLat, sLon) : undefined
+      const price = parseMitecoNumber(s[fuelKey])
+      
+      return {
+        idEstacion: parseInt(s['IDEESS']),
+        nombreEstacion: cleanStationName(s['Rótulo'] || 'Estación sin nombre'),
+        direccion: s['Dirección'],
+        municipio: s['Municipio'],
+        provincia: s['Provincia'],
+        latitud: sLat,
+        longitud: sLon,
+        horario: s['Horario'],
+        marca: s['Rótulo'],
+        margen: s['Margen'],
+        codPostal: s['C.P.'],
+        precioCombustible: price,
+        precioBase: price,
+        precioG95: parseMitecoNumber(s['Precio Gasolina 95 E5']),
+        precioG98: parseMitecoNumber(s['Precio Gasolina 98 E5']),
+        precioDiesel: parseMitecoNumber(s['Precio Gasoleo A']),
+        distancia: dist,
+        lastUpdate: new Date().toISOString()
+      }
+    })
+    .filter(s => s.precioCombustible >= 0.1)
+    .sort((a, b) => {
+      if (a.distancia !== undefined && b.distancia !== undefined) return a.distancia - b.distancia;
+      return a.precioCombustible - b.precioCombustible;
+    })
+}
+

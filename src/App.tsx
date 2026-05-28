@@ -33,21 +33,31 @@ function App() {
 
   useEffect(() => {
     const store = useAppStore.getState()
-    
-    // 1. Initial fetch (using default or restored location)
-    // Only if we don't have stations yet
-    if (store.stations.length === 0) {
-      store.fetchStations()
+
+    // Detectar si la ruta actual es una landing SEO local
+    const match = currentPath.match(/^\/gasolineras-baratas\/([^/]+)(?:\/([^/]+))?$/)
+    let seoFilter: { provincia: string; municipio?: string } | null = null
+
+    if (match) {
+      const provincia = decodeURIComponent(match[1]).replace(/-/g, ' ')
+      const municipio = match[2] ? decodeURIComponent(match[2]).replace(/-/g, ' ') : undefined
+      seoFilter = { provincia, municipio }
     }
 
-    // 2. Try to get real location ONLY if there is no previously saved location
+    // Guardar el filtro SEO detectado en el store antes de cargar estaciones
+    useAppStore.setState({ activeSEOFilter: seoFilter })
+
+    // 1. Carga inicial de estaciones basada en el estado actual
+    store.fetchStations()
+
+    // 2. Intentar obtener la ubicación real si no se ha guardado una previamente
     const hasSavedLocation = !!localStorage.getItem('datafuelle_current_location')
     if (!hasSavedLocation && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords
           setCurrentLocation(latitude, longitude)
-          // Re-fetch only once with the real user location
+          // Re-fetch para calcular distancias con la ubicación real si está disponible
           store.fetchStations()
         },
         (error) => {
@@ -56,7 +66,7 @@ function App() {
         { timeout: 5000 }
       )
     }
-  }, [setCurrentLocation])
+  }, [currentPath, setCurrentLocation])
 
   if (currentPath === '/docu') {
     return <DocuScreen />
