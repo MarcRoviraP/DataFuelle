@@ -30,6 +30,8 @@ export const Sidebar = () => {
     signOut,
     sortBy,
     setSortBy,
+    refuelLiters,
+    setRefuelLiters,
     userCars,
     selectedCarId,
   } = useAppStore()
@@ -40,6 +42,8 @@ export const Sidebar = () => {
   const [suggestions, setSuggestions] = useState<any[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const debounceRef = useRef<number | null>(null)
+
+  const selectedCar = useMemo(() => userCars.find(c => c.id === selectedCarId), [userCars, selectedCarId])
 
   // Verified major brands with >= 100 stations in the global database (Updated from Real DB Stats)
   const brandsToShow = useMemo(() => [
@@ -396,6 +400,46 @@ export const Sidebar = () => {
             </button>
           </div>
         </section>
+
+        {/* Refuel Liters Section */}
+        {sortBy === 'smart' && (
+          <section className="space-y-4 pt-2 border-t border-slate-100 animate-fadeIn">
+            <div className="flex justify-between items-center px-1">
+              <div className="flex items-center gap-2 text-slate-800 font-bold border-l-4 border-blue-500 pl-1">
+                <Fuel size={18} />
+                <h2>Litros a repostar</h2>
+              </div>
+              <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-black border border-blue-100">
+                {refuelLiters} L
+              </span>
+            </div>
+            <div className="px-2">
+              <input
+                type="range"
+                min="5"
+                max="100"
+                step="5"
+                value={refuelLiters}
+                onChange={(e) => setRefuelLiters(parseInt(e.target.value))}
+                className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
+              />
+              <div className="flex justify-between mt-2 text-[10px] font-bold text-slate-400 px-1 uppercase tracking-tighter">
+                <span>5 L</span>
+                <span>50 L</span>
+                <span>100 L</span>
+              </div>
+            </div>
+            {selectedCar ? (
+              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 text-[11px] text-slate-500 leading-normal">
+                💡 <strong>¿Cómo funciona?</strong> El algoritmo suma el costo de repostar <strong>{refuelLiters}L</strong> al costo real de viaje de ida y vuelta usando el consumo de tu <strong>{selectedCar.make} {selectedCar.model}</strong> ({selectedCar.consumo_l_100km} L/100km) y tu tiempo estimado.
+              </div>
+            ) : (
+              <div className="bg-amber-50/70 p-3 rounded-2xl border border-amber-100/50 text-[11px] text-amber-700 leading-normal">
+                ⚠️ <strong>¡Sin vehículo activo!</strong> Agrega o selecciona un vehículo en tu garaje arriba para calcular el costo real de viaje. Actualmente se usa una aproximación genérica basada en la distancia.
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Radius Section */}
         <section className="space-y-4 pt-2 border-t border-slate-100">

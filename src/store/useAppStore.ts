@@ -42,6 +42,8 @@ interface AppState {
   setSelectedBrands: (brands: string[]) => void
   sortBy: 'smart' | 'distance' | 'price'
   setSortBy: (sortBy: 'smart' | 'distance' | 'price') => void
+  refuelLiters: number
+  setRefuelLiters: (liters: number) => void
   showOnlyOpen: boolean
   setShowOnlyOpen: (open: boolean) => void
   showOnlyUpdatedToday: boolean
@@ -158,6 +160,23 @@ export const useAppStore = create<AppState>((set, get) => ({
   sortBy: 'smart',
   setSortBy: (sortBy) => {
     set({ sortBy })
+    get().updateFilteredStations()
+  },
+  refuelLiters: (() => {
+    try {
+      const stored = localStorage.getItem('datafuelle_refuel_liters')
+      if (stored) {
+        const parsed = parseInt(stored, 10)
+        if (!isNaN(parsed) && parsed > 0) return parsed
+      }
+    } catch {}
+    return 35
+  })(),
+  setRefuelLiters: (liters) => {
+    set({ refuelLiters: liters })
+    try {
+      localStorage.setItem('datafuelle_refuel_liters', liters.toString())
+    } catch {}
     get().updateFilteredStations()
   },
   showOnlyOpen: false,
@@ -494,7 +513,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   updateFilteredStations: () => {
-    const { stations, radius, selectedBrands, sortBy, showOnlyOpen, showOnlyUpdatedToday, stationDiscounts, userCars, selectedCarId, showOnlyFavorites, favoriteStationIds } = get()
+    const { stations, radius, selectedBrands, sortBy, showOnlyOpen, showOnlyUpdatedToday, stationDiscounts, userCars, selectedCarId, showOnlyFavorites, favoriteStationIds, refuelLiters } = get()
     
     let filtered = stations.map(s => ({
       ...s,
@@ -556,7 +575,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (selectedCar && selectedCar.consumo_l_100km > 0) {
         // Advanced Smart Filter: Based on REAL COST (Fuel + Time)
         const consumo_km = selectedCar.consumo_l_100km / 100
-        const LITROS_REPOSTAJE_ESTIMADO = 35 // Un tanque parcial más realista
+        const LITROS_REPOSTAJE_ESTIMADO = refuelLiters || 35 // Usar los litros indicados por el usuario
         const VALOR_TIEMPO_HORA = 12 // €/hora (costo de oportunidad)
         const VELOCIDAD_MEDIA_KMH = 35 // km/h (estimación urbana/mixta)
 
