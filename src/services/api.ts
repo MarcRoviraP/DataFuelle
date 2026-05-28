@@ -294,98 +294,109 @@ export const fetchRecentPriceChanges = async (
   // We return empty for now to maintain store compatibility.
   return []
 }
-export const fetchStationHistory = async (idEstacion: number, days: number | null = 30): Promise<any[]> => {
+export const fetchStationHistory = async (
+  idEstacion: number,
+  days: number | null = 30,
+  onChunk?: (data: any[]) => void
+): Promise<any[]> => {
   console.log('🚀 [API] fetchStationHistory LLAMADA para estación:', idEstacion, 'días:', days);
 
-  // 1. Preparar queries en paralelo
-  const fetchDbData = async () => {
-    try {
-      // Use the client directly instead of manual fetch to benefit from internal session management
-      let query = supabase
-        .from('price_history')
-        .select('*')
-        .eq('station_id', idEstacion)
-        .order('recorded_at', { ascending: true });
+  let dbData: any[] = [];
+  let parquetData: any[] = [];
+
+  // Función de ayuda para combinar y de-duplicar
+  const mergeAndEmit = (chunkFromDb: any[], chunkFromParquet: any[]) => {
+    const combined = [...chunkFromParquet, ...chunkFromDb];
+    const validCombined = combined.filter(item => {
+      if (!item.recorded_at) return false;
+      const date = new Date(item.recorded_at);
+      return !isNaN(date.getTime()) && (item.price_95 !== null || item.price_98 !== null || item.price_diesel !== null);
+    });
+
+    const uniqueMap = new Map();
+    validCombined.forEach(item => {
+      uniqueMap.set(item.recorded_at, item);
+    });
+
+    const unique = Array.from(uniqueMap.values());
+    const sorted = unique.sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime());
+    
+    if (onChunk) {
+      onChunk(sorted);
+    }
+    return sorted;
+  };
+
+  // 1. Cargar datos de la DB primero (muy rápido)
+  try {
+    let query = supabase
+      .from('price_history')
+      .select('*')
+      .eq('station_id', idEstacion)
+      .order('recorded_at', { ascending: true });
+
+    if (days !== null) {
+      const since = new Date();
+      since.setDate(since.getDate() - days);
+      query = query.gte('recorded_at', since.toISOString());
+    }
+
+    const { data: rawDbData, error } = await query;
+    if (error) throw error;
+
+    console.log(`[API] Se obtuvieron ${rawDbData?.length || 0} registros de la DB`);
+    
+    const cleanPrice = (val: any) => {
+      if (val === null || val === undefined) return null;
+      const n = Number(val);
+      return (!isNaN(n) && n >= 0.1) ? n : null;
+    };
+
+    dbData = (rawDbData || [])
+      .map((d: any) => ({
+        ...d,
+        price_95: cleanPrice(d.price_95),
+        price_98: cleanPrice(d.price_98),
+        price_diesel: cleanPrice(d.price_diesel)
+      }))
+      .filter((d: any) => {
+        if (isNaN(new Date(d.recorded_at).getTime())) return false;
+        return d.price_95 !== null || d.price_98 !== null || d.price_diesel !== null;
+      });
+
+    // Emitir inmediatamente con lo que tenemos de la DB
+    mergeAndEmit(dbData, []);
+  } catch (error) {
+    console.error('[DB History Error]', error);
+  }
+
+  // 2. Cargar datos de Parquet (más lento, de forma incremental)
+  try {
+    if (days === null || days >= 7) {
+      console.log('[API] Buscando histórico en Parquet vía DuckDB para estación:', idEstacion, 'días:', days);
+      
+      parquetData = await fetchHistoryFromParquet(idEstacion, days, (partialParquet) => {
+        let filteredPartial = partialParquet;
+        if (days !== null) {
+          const since = new Date();
+          since.setDate(since.getDate() - days);
+          filteredPartial = partialParquet.filter(d => new Date(d.recorded_at) >= since);
+        }
+        mergeAndEmit(dbData, filteredPartial);
+      });
 
       if (days !== null) {
         const since = new Date();
         since.setDate(since.getDate() - days);
-        query = query.gte('recorded_at', since.toISOString());
+        parquetData = parquetData.filter(d => new Date(d.recorded_at) >= since);
       }
-
-      const { data: rawDbData, error } = await query;
-
-      if (error) throw error;
-
-      console.log(`[API] Se obtuvieron ${rawDbData?.length || 0} registros de la DB`);
-      
-      const cleanPrice = (val: any) => {
-        if (val === null || val === undefined) return null;
-        const n = Number(val);
-        return (!isNaN(n) && n >= 0.1) ? n : null;
-      };
-
-      return (rawDbData || [])
-        .map((d: any) => ({
-          ...d,
-          price_95: cleanPrice(d.price_95),
-          price_98: cleanPrice(d.price_98),
-          price_diesel: cleanPrice(d.price_diesel)
-        }))
-        .filter((d: any) => {
-          if (isNaN(new Date(d.recorded_at).getTime())) return false;
-          return d.price_95 !== null || d.price_98 !== null || d.price_diesel !== null;
-        });
-    } catch (error) {
-      console.error('[DB History Error]', error);
-      return [];
     }
-  };
-
-  const fetchParquetData = async () => {
-    try {
-      // Siempre buscamos en Parquet si se piden 7 días o más, o si es el historial completo
-      if (days === null || days >= 7) {
-        console.log('[API] Buscando histórico en Parquet vía DuckDB para estación:', idEstacion, 'días:', days)
-        let historicalData = await fetchHistoryFromParquet(idEstacion, days)
-        console.log(`[API] Se obtuvieron ${historicalData.length} registros del historial Parquet`)
-        
-        if (days !== null) {
-          const since = new Date()
-          since.setDate(since.getDate() - days)
-          historicalData = historicalData.filter(d => new Date(d.recorded_at) >= since)
-        }
-        return historicalData
-      }
-    } catch (error) {
-      console.error('[API] Error al obtener datos de Parquet:', error)
-      return []
-    }
-    return []
+  } catch (error) {
+    console.error('[API] Error al obtener datos de Parquet:', error);
   }
 
-  // 2. Ejecutar en paralelo
-  const [dbData, historicalData] = await Promise.all([fetchDbData(), fetchParquetData()])
-
-  // 3. Combinar y de-duplicar (por si hay solapamiento)
-  const combined = [...historicalData, ...dbData]
-  
-  // Filter out any entries with invalid dates or missing all prices
-  const validCombined = combined.filter(item => {
-    if (!item.recorded_at) return false
-    const date = new Date(item.recorded_at)
-    return !isNaN(date.getTime()) && (item.price_95 !== null || item.price_98 !== null || item.price_diesel !== null)
-  })
-
-  // Deduplicate by timestamp (recorded_at)
-  const uniqueMap = new Map()
-  validCombined.forEach(item => {
-    uniqueMap.set(item.recorded_at, item)
-  })
-  
-  const unique = Array.from(uniqueMap.values())
-  
-  return unique.sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime())
+  // Retornar el set final completo combinando todo
+  return mergeAndEmit(dbData, parquetData);
 }
 
 export const fetchPredictions = async (_idFuelType: number, stationIds?: number[]): Promise<any[]> => {

@@ -1,4 +1,4 @@
-import { useState, memo, useRef } from 'react'
+import { useState, memo, useRef, useMemo } from 'react'
 import { fetchStationHistory, type Station } from '../services/api'
 import { MapPin, Clock, Navigation, Tag, Calendar, TrendingUp, ChevronDown, ChevronUp, Heart } from 'lucide-react'
 import { shouldShowLastUpdate, formatLastUpdate } from '../utils/date'
@@ -47,9 +47,15 @@ export const StationCard = memo(({ station, isSelected, onClick }: StationCardPr
   const loadHistory = async (days: number | null) => {
     const rid = ++fetchRequestId.current
     setLoadingHistory(true)
+    setHistoryData([])
     
     try {
-      const data = await fetchStationHistory(station.idEstacion, days)
+      const data = await fetchStationHistory(station.idEstacion, days, (chunkData) => {
+        if (rid === fetchRequestId.current) {
+          setHistoryData(chunkData)
+          setLoadingHistory(false)
+        }
+      })
       // Only update if this is still the latest request
       if (rid === fetchRequestId.current) {
         setHistoryData(data)
@@ -84,6 +90,25 @@ export const StationCard = memo(({ station, isSelected, onClick }: StationCardPr
     const icon  = diff > 0 ? '▲' : diff < 0 ? '▼' : '='
     return <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${color}`}>{icon} {Math.abs(diff).toFixed(3)}€</span>
   })() : null
+
+  // Memoize chart data to stabilize reference across renders
+  const chartData = useMemo(() => {
+    return historyData
+      .filter(d => d[fuelKey] !== null && d[fuelKey] !== undefined && Number(d[fuelKey]) >= 0.1)
+      .map(d => {
+        try {
+          const date = new Date(d.recorded_at)
+          if (isNaN(date.getTime())) return null
+          return {
+            time: date.toISOString().split('T')[0],
+            value: Number(d[fuelKey])
+          }
+        } catch (e) {
+          return null
+        }
+      })
+      .filter((item): item is { time: string; value: number } => item !== null)
+  }, [historyData, fuelKey])
 
   return (
     <div
@@ -223,22 +248,7 @@ export const StationCard = memo(({ station, isSelected, onClick }: StationCardPr
           ) : historyData.length > 0 ? (
             <>
               <LightweightChart 
-                data={historyData
-                  .filter(d => d[fuelKey] !== null && d[fuelKey] !== undefined && Number(d[fuelKey]) >= 0.1)
-                  .map(d => {
-                    try {
-                      const date = new Date(d.recorded_at)
-                      if (isNaN(date.getTime())) return null
-                      return {
-                        time: date.toISOString().split('T')[0],
-                        value: Number(d[fuelKey])
-                      }
-                    } catch (e) {
-                      return null
-                    }
-                  })
-                  .filter((item): item is {time: string, value: number} => item !== null)
-                } 
+                data={chartData} 
               />
               <p className="text-[9px] text-slate-400 text-right mt-1">
                 {historyData.length} registros
