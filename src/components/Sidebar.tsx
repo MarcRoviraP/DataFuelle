@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo } from 'react'
 import { useAppStore } from '../store/useAppStore'
 import { fetchSuggestions, geocodeAddress } from '../utils/geo'
-import { Search, MapPin, Fuel, Navigation, History, Filter, X, Tag, LogIn, LogOut, Zap, ArrowUpDown, Car, BookOpen } from 'lucide-react'
+import { Search, MapPin, Fuel, Navigation, History, Filter, X, Tag, LogIn, LogOut, Zap, ArrowUpDown, Car } from 'lucide-react'
 import { Garage } from './Garage'
 import { SmartPrediction } from './SmartPrediction'
 
