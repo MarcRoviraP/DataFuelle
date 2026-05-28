@@ -164,18 +164,6 @@ export const Sidebar = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                window.history.pushState({}, '', '/docu')
-                const navEvent = new PopStateEvent('popstate')
-                window.dispatchEvent(navEvent)
-              }}
-              className="flex items-center gap-1.5 px-3 py-2 text-slate-500 hover:text-purple-600 hover:bg-purple-50 rounded-xl border border-slate-100 hover:border-purple-100 transition-all duration-200 cursor-pointer group"
-              title="Ver Documentación"
-            >
-              <BookOpen size={16} className="group-hover:scale-110 transition-transform text-purple-500" />
-              <span className="text-xs font-black uppercase tracking-tight">Docs</span>
-            </button>
 
             {!user ? (
               <button
