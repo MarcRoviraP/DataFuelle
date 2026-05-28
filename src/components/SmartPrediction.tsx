@@ -5,7 +5,15 @@ import { getGeminiAdvice } from '../services/gemini'
 import { useAppStore } from '../store/useAppStore'
 
 export const SmartPrediction = () => {
-  const { selectedFuelTypeId, fuelTypes, filteredStations, userCars, selectedCarId } = useAppStore()
+  const { 
+    selectedFuelTypeId, 
+    fuelTypes, 
+    filteredStations, 
+    userCars, 
+    selectedCarId,
+    setSelectedStationId,
+    setViewMode
+  } = useAppStore()
   const [bestStation, setBestStation] = useState<any | null>(null)
   const [advice, setAdvice] = useState<string>('')
   const [loading, setLoading] = useState(false)
@@ -157,32 +165,41 @@ export const SmartPrediction = () => {
             </div>
           ) : bestStation ? (
             <>
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex flex-col">
-                  <span className="text-[9px] font-black text-purple-600 uppercase tracking-widest flex items-center gap-1">
-                    <TrendingDown size={10} />
-                    Ganadora de la semana
-                  </span>
-                  <h4 className="text-sm font-black text-slate-900 mt-1 leading-tight">
-                    {bestStation.station.name}
-                  </h4>
+              <div 
+                onClick={() => {
+                  setSelectedStationId(bestStation.station_id)
+                  setViewMode('map')
+                }}
+                className="group/card cursor-pointer border border-purple-100 rounded-xl p-3 bg-white hover:border-purple-300 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
+                title="Ver en el mapa"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex flex-col min-w-0 pr-2">
+                    <span className="text-[9px] font-black text-purple-600 uppercase tracking-widest flex items-center gap-1">
+                      <TrendingDown size={10} />
+                      Ganadora de la semana
+                    </span>
+                    <h4 className="text-xs font-black text-slate-900 mt-1 leading-tight truncate group-hover/card:text-purple-700 transition-colors">
+                      {bestStation.station.name}
+                    </h4>
+                  </div>
+                  <div className="bg-purple-600 text-white px-2.5 py-1 rounded-xl flex flex-col items-center shadow-md shadow-purple-100 shrink-0">
+                    <span className="text-[13px] font-black leading-none">
+                      {bestStation[fuelKey].toFixed(3)}
+                    </span>
+                    <span className="text-[7px] font-bold uppercase tracking-tighter mt-1 opacity-90">€/L {selectedFuelName}</span>
+                  </div>
                 </div>
-                <div className="bg-purple-600 text-white px-3 py-1.5 rounded-xl flex flex-col items-center shadow-lg shadow-purple-100">
-                  <span className="text-[16px] font-black leading-none">
-                    {bestStation[fuelKey].toFixed(3)}
-                  </span>
-                  <span className="text-[8px] font-bold uppercase tracking-tighter mt-1 opacity-80">€/L {selectedFuelName}</span>
-                </div>
-              </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-slate-500 text-[10px] font-bold">
-                  <MapPin size={12} className="shrink-0" />
-                  <span className="truncate">{bestStation.station.municipality}, {bestStation.station.province}</span>
-                </div>
-                <div className="flex items-center gap-2 text-slate-500 text-[10px] font-bold">
-                  <Calendar size={12} className="shrink-0" />
-                  <span>Para el día: {new Date(bestStation.target_date).toLocaleDateString()}</span>
+                <div className="space-y-1.5 border-t border-dashed border-purple-100 pt-2.5">
+                  <div className="flex items-center gap-2 text-slate-500 text-[10px] font-bold">
+                    <MapPin size={11} className="shrink-0 text-purple-400" />
+                    <span className="truncate">{bestStation.station.municipality}, {bestStation.station.province}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-500 text-[10px] font-bold">
+                    <Calendar size={11} className="shrink-0 text-purple-400" />
+                    <span>Para el día: {new Date(bestStation.target_date).toLocaleDateString()}</span>
+                  </div>
                 </div>
               </div>
 
