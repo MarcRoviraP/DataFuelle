@@ -4,6 +4,10 @@ import { fetchSuggestions, geocodeAddress } from '../utils/geo'
 import { Search, MapPin, Fuel, Navigation, History, Filter, X, Tag, LogIn, LogOut, Zap, ArrowUpDown, Car } from 'lucide-react'
 import { Garage } from './Garage'
 import { SmartPrediction } from './SmartPrediction'
+const RADIUS_STEPS = [
+  ...Array.from({ length: 50 }, (_, i) => i + 1),
+  100, 200, 300, 400, 500, 750, 1000, 1250, 1500, 2000
+]
 
 export const Sidebar = () => {
   const {
@@ -452,17 +456,17 @@ export const Sidebar = () => {
           <div className="px-2">
             <input
               type="range"
-              min="1"
-              max="50"
+              min="0"
+              max={RADIUS_STEPS.length - 1}
               step="1"
-              value={radius}
-              onChange={(e) => handleRadiusChange(parseInt(e.target.value))}
+              value={RADIUS_STEPS.indexOf(radius) !== -1 ? RADIUS_STEPS.indexOf(radius) : 39}
+              onChange={(e) => handleRadiusChange(RADIUS_STEPS[parseInt(e.target.value)])}
               className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
             />
             <div className="flex justify-between mt-2 text-[10px] font-bold text-slate-400 px-1 uppercase tracking-tighter">
               <span>1 km</span>
-              <span>25 km</span>
-              <span>50 km</span>
+              <span>1000 km</span>
+              <span>2000 km</span>
             </div>
           </div>
         </section>
