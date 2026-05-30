@@ -1,6 +1,6 @@
 # Skill Registry - datafuelle
 
-## Project Standards
+## Compact Rules
 
 - Framework: React 19
 - Language: TypeScript

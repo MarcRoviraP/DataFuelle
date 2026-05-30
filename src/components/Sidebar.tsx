@@ -465,7 +465,11 @@ export const Sidebar = () => {
             />
             <div className="flex justify-between mt-2 text-[10px] font-bold text-slate-400 px-1 uppercase tracking-tighter">
               <span>1 km</span>
-              <span>1000 km</span>
+              <span>10 km</span>
+              <span>20 km</span>
+              <span>30 km</span>
+              <span>40 km</span>
+              <span>50 km</span>
               <span>2000 km</span>
             </div>
           </div>
