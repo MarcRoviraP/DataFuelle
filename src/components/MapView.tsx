@@ -678,7 +678,7 @@ export const MapView = () => {
                       transition: 'all 0.2s',
                     }}
                   >
-                    📍 Trazar ruta en la app
+                    Trazar ruta en la app
                   </button>
 
                   <a
