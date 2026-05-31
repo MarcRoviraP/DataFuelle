@@ -3,7 +3,7 @@ import { Sidebar } from './components/Sidebar'
 import { StationList } from './components/StationList'
 import { MapView } from './components/MapView'
 import { useAppStore } from './store/useAppStore'
-import { X, Map as MapIcon, List, BookOpen } from 'lucide-react'
+import { X, Map as MapIcon, List } from 'lucide-react'
 import { Menu } from 'lucide-react'
 import { AuthScreen } from './components/AuthScreen'
 import { DocuScreen } from './components/DocuScreen'
@@ -83,17 +83,6 @@ function App() {
             <Menu size={24} />
           </button>
           
-          <button 
-            onClick={() => {
-              window.history.pushState({}, '', '/docu')
-              const navEvent = new PopStateEvent('popstate')
-              window.dispatchEvent(navEvent)
-            }}
-            className="lg:hidden fixed top-6 right-4 z-[1000] p-3 bg-white/80 backdrop-blur-xl border border-white/40 rounded-2xl shadow-xl text-slate-600 hover:bg-white transition-all active:scale-95"
-            title="Documentación"
-          >
-            <BookOpen size={24} />
-          </button>
         </>
       )}
 

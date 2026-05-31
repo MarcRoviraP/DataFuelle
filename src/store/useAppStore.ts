@@ -207,30 +207,44 @@ export const useAppStore = create<AppState>((set, get) => ({
   setFuelTypes: (types) => set({ fuelTypes: types }),
 
   stations: [],
-  setStations: (stations) => {
-    const { currentLocation } = get()
-    let stationsWithDist = stations
-    if (currentLocation) {
-      stationsWithDist = stations.map((s) => ({
-        ...s,
-        distancia: calculateDistance(currentLocation.lat, currentLocation.lon, s.latitud, s.longitud),
-      }))
-    }
+  setStations: (newStations) => {
+    const { currentLocation, stations: currentStations, priceChanges } = get()
     
-    // Apply existing price changes if any
-    const changes = get().priceChanges
-    const stationsWithChanges = stationsWithDist.map(s => {
-      const change = changes.get(s.idEstacion)
-      return { 
-        ...s, 
-        precioBase: s.precioCombustible,
-        diff: change ? parseFloat(change.diferencia) : undefined,
-        delta_pct: change ? parseFloat(change.delta_pct) : undefined,
-        precioAnterior: change ? parseFloat(change.precioAnterior) : undefined
-      }
-    })
+    const mergedStationsMap = new Map(currentStations.map(s => [s.idEstacion, s]))
 
-    set({ stations: stationsWithChanges })
+    for (const newS of newStations) {
+      const change = priceChanges.get(newS.idEstacion)
+      const diff = change ? parseFloat(change.diferencia) : undefined
+      const delta_pct = change ? parseFloat(change.delta_pct) : undefined
+      const precioAnterior = change ? parseFloat(change.precioAnterior) : undefined
+      
+      const dist = currentLocation 
+        ? calculateDistance(currentLocation.lat, currentLocation.lon, newS.latitud, newS.longitud) 
+        : newS.distancia
+
+      const existing = mergedStationsMap.get(newS.idEstacion)
+      
+      // Keep existing reference if core data hasn't changed to avoid React re-renders
+      if (
+        existing &&
+        existing.precioBase === newS.precioCombustible &&
+        existing.distancia === dist &&
+        existing.diff === diff
+      ) {
+        continue // Already in map with correct reference
+      }
+
+      mergedStationsMap.set(newS.idEstacion, {
+        ...newS,
+        distancia: dist,
+        precioBase: newS.precioCombustible,
+        diff,
+        delta_pct,
+        precioAnterior
+      })
+    }
+
+    set({ stations: Array.from(mergedStationsMap.values()) })
     get().updateFilteredStations()
   },
 
@@ -270,9 +284,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectedStationId: null,
   setSelectedStationId: (id) => {
     set({ selectedStationId: id })
-    if (id === null) {
-      get().clearRoute()
-    }
   },
 
   routeCoordinates: null,
@@ -282,31 +293,39 @@ export const useAppStore = create<AppState>((set, get) => ({
   fetchRoute: async (stationId, stationLat, stationLng) => {
     const { currentLocation } = get()
     if (!currentLocation) {
-      console.warn("⚠️ No se puede trazar la ruta sin ubicación actual.")
+      alert("⚠️ No se puede trazar la ruta sin ubicación actual. Por favor, activa tu ubicación.")
       return
     }
 
     try {
       const url = `https://router.project-osrm.org/route/v1/driving/${currentLocation.lon},${currentLocation.lat};${stationLng},${stationLat}?overview=full&geometries=geojson`
       const response = await fetch(url)
-      if (!response.ok) throw new Error("Error en la respuesta de OSRM")
+      
+      if (!response.ok) {
+        throw new Error("Error en la respuesta de OSRM (Servicio no disponible o ruta demasiado compleja)")
+      }
+      
       const data = await response.json()
       
-      if (data.routes && data.routes.length > 0) {
-        const route = data.routes[0]
-        const coords = route.geometry.coordinates.map((c: any) => [c[1], c[0]] as [number, number])
-        
-        set({
-          routeCoordinates: coords,
-          routeInfo: {
-            distance: route.distance,
-            duration: route.duration
-          },
-          activeRouteStationId: stationId
-        })
+      if (data.code === 'NoRoute' || !data.routes || data.routes.length === 0) {
+        alert("🚗 No se ha podido encontrar una ruta en coche hasta esta gasolinera (puede estar en otra isla o en una zona sin carreteras mapeadas).")
+        return
       }
-    } catch (error) {
+
+      const route = data.routes[0]
+      const coords = route.geometry.coordinates.map((c: any) => [c[1], c[0]] as [number, number])
+      
+      set({
+        routeCoordinates: coords,
+        routeInfo: {
+          distance: route.distance,
+          duration: route.duration
+        },
+        activeRouteStationId: stationId
+      })
+    } catch (error: any) {
       console.error("❌ [Store Route] Error al obtener ruta:", error)
+      alert("❌ Fallo al intentar conectar con el servicio de rutas. Revisa tu conexión a internet o inténtalo más tarde. (" + error.message + ")")
     }
   },
 
@@ -537,10 +556,23 @@ export const useAppStore = create<AppState>((set, get) => ({
   updateFilteredStations: () => {
     const { stations, radius, selectedBrands, sortBy, showOnlyOpen, showOnlyUpdatedToday, stationDiscounts, userCars, selectedCarId, showOnlyFavorites, favoriteStationIds, refuelLiters, activeSEOFilter } = get()
     
-    let filtered = stations.map(s => ({
-      ...s,
-      precioCombustible: (s.precioBase || 0) - (stationDiscounts.get(s.idEstacion) || 0)
-    })).filter(s => (s.precioBase || 0) > 0)
+    const currentFilteredMap = new Map(get().filteredStations.map(s => [s.idEstacion, s]))
+
+    let filtered = stations.map(s => {
+      const discount = stationDiscounts.get(s.idEstacion) || 0
+      const newPrecio = (s.precioBase || 0) - discount
+      
+      const existing = currentFilteredMap.get(s.idEstacion)
+      // Reutiliza la referencia en memoria si el precio y la distancia son idénticos
+      if (existing && existing.precioCombustible === newPrecio && existing.distancia === s.distancia) {
+        return existing
+      }
+      
+      return {
+        ...s,
+        precioCombustible: newPrecio
+      }
+    }).filter(s => (s.precioBase || 0) > 0)
 
     if (activeSEOFilter) {
       const { provincia, municipio } = activeSEOFilter
@@ -673,6 +705,16 @@ export const useAppStore = create<AppState>((set, get) => ({
           return (a.distancia || 0) - (b.distancia || 0)
         }
       })
+    }
+
+    // 🔥 VIRTUALIZACIÓN / LÍMITE:
+    // Nunca renderizar más de 1500 estaciones a la vez para evitar congelamientos en el DOM
+    // tanto en la lista de estaciones como en el MarkerCluster de Leaflet.
+    // Como la lista ya está ordenada (por smart, precio o distancia), el usuario siempre
+    // verá las 1500 "mejores" opciones, lo cual es más que suficiente.
+    const MAX_RENDER_STATIONS = 1500
+    if (filtered.length > MAX_RENDER_STATIONS) {
+      filtered = filtered.slice(0, MAX_RENDER_STATIONS)
     }
 
     const currentFiltered = get().filteredStations

@@ -124,7 +124,6 @@ const MarkerOpener = ({
     if (marker) {
       const latlng = marker.getLatLng()
       map.setView(latlng, Math.max(map.getZoom(), 15), { animate: true })
-      marker.openPopup()
     }
   }, [stationId, map, markerRefs])
   return null
@@ -161,16 +160,16 @@ const LocateMeButton = () => {
     <div 
       ref={buttonRef}
       className="leaflet-bottom leaflet-right" 
-      style={{ marginBottom: '30px', marginRight: '10px', pointerEvents: 'auto', zIndex: 1000 }}
+      style={{ marginBottom: '30px', pointerEvents: 'auto', zIndex: 1000 }}
     >
       <div className="leaflet-control">
         <button
           onClick={handleLocate}
-          className="bg-white hover:bg-slate-50 text-blue-600 p-2.5 rounded-xl shadow-2xl border-2 border-white transition-all active:scale-90 flex items-center justify-center group/btn"
+          className="bg-white hover:bg-slate-50 text-blue-600 rounded-xl shadow-2xl border-2 border-white transition-all active:scale-90 flex items-center justify-center group/btn"
           title="Mi ubicación"
-          style={{ width: '46px', height: '46px' }}
+          style={{ width: '40px', height: '40px' }}
         >
-          <LocateFixed size={24} className="group-hover/btn:scale-110 transition-transform" />
+          <LocateFixed size={20} className="group-hover/btn:scale-110 transition-transform" />
         </button>
       </div>
     </div>
@@ -506,7 +505,7 @@ export const MapView = () => {
             <Marker
               key={station.idEstacion}
               position={[station.latitud, station.longitud]}
-              icon={getPriceIcon(station.precioCombustible, selectedStationId === station.idEstacion)}
+              icon={getPriceIcon(station.precioCombustible, false)}
               // @ts-ignore - custom property for cluster logic
               stationPrice={station.precioCombustible}
               ref={(ref) => {
@@ -516,9 +515,20 @@ export const MapView = () => {
               eventHandlers={{
                 click: () => useAppStore.getState().setSelectedStationId(station.idEstacion)
               }}
+            />
+          )), [filteredStations, getPriceIcon])}
+        </MarkerClusterGroup>
+
+        {/* ÚNICO POPUP FLOTANTE (Optimización) */}
+        {selectedStationId && (() => {
+          const station = filteredStations.find(s => s.idEstacion === selectedStationId)
+          if (!station) return null
+          return (
+            <Popup 
+              position={[station.latitud, station.longitud]} 
+              eventHandlers={{ remove: () => useAppStore.getState().setSelectedStationId(null) }} 
+              minWidth={200}
             >
-              <Popup minWidth={200}>
-                {/* ... existing popup content ... */}
                 <div style={{ padding: '4px 2px', minWidth: 200 }}>
                   <div style={{
                     display: 'flex',
@@ -637,11 +647,18 @@ export const MapView = () => {
                   </div>
 
                   <button
-                    onClick={async () => {
+                    onPointerDown={async (e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      console.log("🔥 [UI] Trazar ruta solicitado para:", station.idEstacion);
                       const store = useAppStore.getState()
                       await store.fetchRoute(station.idEstacion, station.latitud, station.longitud)
-                      const marker = markerRefs.current.get(station.idEstacion)
-                      if (marker) marker.closePopup()
+                      // No marker popup to close anymore since it's floating, just close it here
+                      useAppStore.getState().setSelectedStationId(null)
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
                     }}
                     style={{
                       display: 'flex',
@@ -712,10 +729,9 @@ export const MapView = () => {
                     📋 Ver en lista
                   </button>
                 </div>
-              </Popup>
-            </Marker>
-          )), [filteredStations, selectedStationId, selectedFuelTypeId, stationDiscounts, favoriteStationIds])}
-        </MarkerClusterGroup>
+            </Popup>
+          )
+        })()}
       </MapContainer>
 
       {routeCoordinates && routeInfo && (

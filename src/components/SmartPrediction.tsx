@@ -4,6 +4,18 @@ import { fetchPredictions } from '../services/api'
 import { getGeminiAdvice } from '../services/gemini'
 import { useAppStore } from '../store/useAppStore'
 
+const renderMarkdown = (text: string) => {
+  if (!text) return null;
+  const parts = text.split(/\*\*(.*?)\*\*/g);
+  return (
+    <>
+      {parts.map((part, index) => 
+        index % 2 === 1 ? <strong key={index} className="font-extrabold text-purple-900">{part}</strong> : part
+      )}
+    </>
+  );
+};
+
 export const SmartPrediction = () => {
   const { 
     selectedFuelTypeId, 
@@ -209,7 +221,7 @@ export const SmartPrediction = () => {
                     Consejo del Experto
                   </div>
                   <p className="text-[11px] text-slate-700 italic leading-snug font-medium">
-                    "{advice}"
+                    "{renderMarkdown(advice)}"
                   </p>
                 </div>
               )}
