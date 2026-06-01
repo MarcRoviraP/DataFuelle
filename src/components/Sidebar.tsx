@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react'
+import { useState, useRef, useMemo, useEffect } from 'react'
 import { useAppStore } from '../store/useAppStore'
 import { fetchSuggestions, geocodeAddress } from '../utils/geo'
 import { Search, MapPin, Fuel, Navigation, History, Filter, X, Tag, LogIn, LogOut, Zap, ArrowUpDown, Car } from 'lucide-react'
@@ -46,8 +46,13 @@ export const Sidebar = () => {
   const [suggestions, setSuggestions] = useState<any[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const debounceRef = useRef<number | null>(null)
+  const radiusDebounceRef = useRef<number | null>(null)
 
+  const [localRadius, setLocalRadius] = useState<number>(radius)
 
+  useEffect(() => {
+    setLocalRadius(radius)
+  }, [radius])
 
   const selectedCar = useMemo(() => userCars.find(c => c.id === selectedCarId), [userCars, selectedCarId])
 
@@ -149,11 +154,16 @@ export const Sidebar = () => {
     }
   }
 
-  const handleRadiusChange = async (r: number) => {
-    setRadius(r)
-    if (stations.length > 0 && currentLocation) {
-      useAppStore.getState().fetchStations()
-    }
+  const handleRadiusChange = (r: number) => {
+    setLocalRadius(r)
+    if (radiusDebounceRef.current) clearTimeout(radiusDebounceRef.current)
+    radiusDebounceRef.current = window.setTimeout(() => {
+      setRadius(r)
+      // Check if we need to fetch. If stations exist and location is set.
+      if (useAppStore.getState().stations.length > 0 && useAppStore.getState().currentLocation) {
+        useAppStore.getState().fetchStations()
+      }
+    }, 30) // 30ms (~33fps) para sensación de tiempo real sin saturar el hilo principal
   }
 
   const activeCar = userCars.find(c => c.id === selectedCarId)
@@ -450,7 +460,7 @@ export const Sidebar = () => {
               <h2>Radio de búsqueda</h2>
             </div>
             <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-black border border-blue-100">
-              {radius} km
+              {localRadius} km
             </span>
           </div>
           <div className="px-2">
@@ -459,7 +469,7 @@ export const Sidebar = () => {
               min="0"
               max={RADIUS_STEPS.length - 1}
               step="1"
-              value={RADIUS_STEPS.indexOf(radius) !== -1 ? RADIUS_STEPS.indexOf(radius) : 39}
+              value={RADIUS_STEPS.indexOf(localRadius) !== -1 ? RADIUS_STEPS.indexOf(localRadius) : 39}
               onChange={(e) => handleRadiusChange(RADIUS_STEPS[parseInt(e.target.value)])}
               className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
             />
@@ -582,9 +592,17 @@ export const Sidebar = () => {
         {/* History Section */}
         {searchHistory.length > 0 && (
           <section className="space-y-4 pt-2 border-t border-slate-100">
-            <div className="flex items-center gap-2 text-slate-800 font-bold px-1 border-l-4 border-blue-500">
-              <History size={18} />
-              <h2>Búsquedas Recientes</h2>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-slate-800 font-bold px-1 border-l-4 border-blue-500">
+                <History size={18} />
+                <h2>Búsquedas Recientes</h2>
+              </div>
+              <button
+                onClick={() => useAppStore.getState().clearHistory()}
+                className="text-xs text-slate-400 hover:text-red-500 transition-colors font-medium px-2 py-1 rounded hover:bg-red-50"
+              >
+                Limpiar
+              </button>
             </div>
             <div className="flex flex-wrap gap-2">
               {searchHistory.map((h, i) => (

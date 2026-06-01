@@ -242,15 +242,22 @@ export const MapView = () => {
   const prices = useMemo(() => filteredStations.map(s => s.precioCombustible).filter(p => p > 0), [filteredStations])
   const averagePrice = useMemo(() => prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : 0, [prices])
 
+  // Use a ref for average price to avoid re-creating icon functions (which tears down the cluster group)
+  const avgPriceRef = useRef(averagePrice)
+  useEffect(() => {
+    avgPriceRef.current = averagePrice
+  }, [averagePrice])
+
   // Icon Cache to prevent flickering
   const iconCache = useRef<Map<string, L.DivIcon>>(new Map())
 
   const getPriceIcon = useCallback((price: number, isSelected: boolean) => {
     let color = '#64748b' // Default slate
+    const currentAvg = avgPriceRef.current
     
-    if (price > 0 && averagePrice > 0) {
-      if (price < averagePrice * 0.98) color = '#16a34a' // Green (Cheap)
-      else if (price > averagePrice * 1.02) color = '#dc2626' // Red (Expensive)
+    if (price > 0 && currentAvg > 0) {
+      if (price < currentAvg * 0.98) color = '#16a34a' // Green (Cheap)
+      else if (price > currentAvg * 1.02) color = '#dc2626' // Red (Expensive)
       else color = '#d97706' // Orange (Average)
     }
 
@@ -286,7 +293,7 @@ export const MapView = () => {
 
     iconCache.current.set(cacheKey, icon)
     return icon
-  }, [averagePrice])
+  }, [])
 
   // Cluster Icon Cache
   const clusterIconCache = useRef<Map<string, L.DivIcon>>(new Map())
@@ -304,9 +311,10 @@ export const MapView = () => {
     })
 
     let color = '#d97706' // Orange (Default)
-    if (minPriceInCluster !== Infinity && averagePrice > 0) {
-      if (minPriceInCluster < averagePrice * 0.98) color = '#16a34a' // Green (Cheap)
-      else if (minPriceInCluster > averagePrice * 1.02) color = '#dc2626' // Red (Expensive)
+    const currentAvg = avgPriceRef.current
+    if (minPriceInCluster !== Infinity && currentAvg > 0) {
+      if (minPriceInCluster < currentAvg * 0.98) color = '#16a34a' // Green (Cheap)
+      else if (minPriceInCluster > currentAvg * 1.02) color = '#dc2626' // Red (Expensive)
     }
 
     const cacheKey = `${count}-${minPriceInCluster}-${color}`
@@ -341,7 +349,7 @@ export const MapView = () => {
 
     clusterIconCache.current.set(cacheKey, icon)
     return icon
-  }, [averagePrice])
+  }, [])
 
   // Fuel badge config
   const fuels = [
