@@ -109,23 +109,26 @@ const MapController = ({ center }: { center: { lat: number; lon: number } | null
   return null
 }
 
-// Programmatically open the popup of the selected marker
+// Programmatically center map on selected station
 const MarkerOpener = ({
   stationId,
-  markerRefs,
 }: {
   stationId: number | null
-  markerRefs: React.MutableRefObject<Map<number, L.Marker>>
 }) => {
   const map = useMap()
+  const filteredStations = useAppStore(state => state.filteredStations)
+
   useEffect(() => {
     if (stationId === null) return
-    const marker = markerRefs.current.get(stationId)
-    if (marker) {
-      const latlng = marker.getLatLng()
-      map.setView(latlng, Math.max(map.getZoom(), 15), { animate: true })
+    const station = filteredStations.find(s => s.idEstacion === stationId)
+    if (station) {
+      // Small delay to allow CSS/Layout changes (like toggling viewMode to 'map') to apply
+      setTimeout(() => {
+        map.invalidateSize()
+        map.setView([station.latitud, station.longitud], Math.max(map.getZoom(), 15), { animate: true })
+      }, 50)
     }
-  }, [stationId, map, markerRefs])
+  }, [stationId, map, filteredStations])
   return null
 }
 
@@ -421,7 +424,7 @@ export const MapView = () => {
         <MapController center={currentLocation} />
         <MapEvents />
         <LocateMeButton />
-        <MarkerOpener stationId={selectedStationId} markerRefs={markerRefs} />
+        <MarkerOpener stationId={selectedStationId} />
 
         {currentLocation && (
           <>
@@ -528,6 +531,7 @@ export const MapView = () => {
               position={[station.latitud, station.longitud]} 
               eventHandlers={{ remove: () => useAppStore.getState().setSelectedStationId(null) }} 
               minWidth={200}
+              autoPan={false}
             >
                 <div style={{ padding: '4px 2px', minWidth: 200 }}>
                   <div style={{

@@ -19,7 +19,8 @@ function App() {
     fuelTypes,
     viewMode,
     setViewMode,
-    isAuthScreenOpen
+    isAuthScreenOpen,
+    isListExpanded
   } = useAppStore()
   const selectedFuelName = fuelTypes.find(f => f.idFuelType === selectedFuelTypeId)?.fuelTypeName || 'Combustible'
 
@@ -109,15 +110,19 @@ function App() {
 
       <main className="flex-1 flex flex-col xl:flex-row overflow-hidden relative">
         {/* Results List - Visible on XL or if explicitly selected on mobile */}
-        <section className={`flex-1 xl:flex-none min-h-0 xl:w-[350px] xl:shrink-0 xl:flex flex-col border-r border-slate-200 bg-white ${
-          viewMode === 'list' ? 'flex' : 'hidden xl:flex'
+        <section className={`flex-1 min-h-0 flex-col border-r border-slate-200 bg-white ${
+          viewMode === 'list' ? 'flex' : 'hidden'
+        } ${
+          isListExpanded ? 'xl:flex xl:flex-1' : 'xl:flex xl:flex-none xl:w-[350px] xl:shrink-0'
         }`}>
           <StationList />
         </section>
 
         {/* Map View - Full screen on mobile unless List is active, or persistent on XL */}
         <section className={`flex-1 min-h-0 shadow-inner relative ${
-          viewMode === 'map' ? 'flex' : 'hidden xl:flex'
+          viewMode === 'map' ? 'flex' : 'hidden'
+        } ${
+          isListExpanded ? 'xl:hidden' : 'xl:flex'
         }`}>
           <MapView />
           

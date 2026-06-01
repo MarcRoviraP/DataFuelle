@@ -16,7 +16,7 @@ export const getGeminiAdvice = async (
 ): Promise<string> => {
   if (!genAI) {
     console.error('❌ [Gemini] VITE_GEMINI_API_KEY no configurada en el .env');
-    return "Configurá tu API Key para recibir consejos.";
+    return "Configura tu API Key para recibir consejos.";
   }
 
   // Le pasamos la versión de la API aquí, que es donde el SDK lo permite
@@ -54,7 +54,7 @@ export const getGeminiAdvice = async (
       const response = await result.response;
       const text = response.text();
       
-      return text.trim() || "¡Ahorrá combustible hoy mismo!";
+      return text.trim() || "¡Ahorra combustible hoy mismo!";
     } catch (error: any) {
       attempt++;
       console.warn(`⚠️ [Gemini] Intento ${attempt} fallido:`, error.message);

@@ -60,6 +60,8 @@ interface AppState {
   // UI State
   isSidebarOpen: boolean
   setIsSidebarOpen: (isOpen: boolean) => void
+  isListExpanded: boolean
+  setIsListExpanded: (isExpanded: boolean) => void
   // Price changes data
   priceChanges: Map<number, any>
   setPriceChanges: (changes: any[]) => void
@@ -112,6 +114,8 @@ interface AppState {
 export const useAppStore = create<AppState>((set, get) => ({
   isSidebarOpen: false,
   setIsSidebarOpen: (isOpen) => set({ isSidebarOpen: isOpen }),
+  isListExpanded: false,
+  setIsListExpanded: (isExpanded) => set({ isListExpanded: isExpanded }),
   viewMode: 'map',
   setViewMode: (mode) => set({ viewMode: mode }),
   currentLocation: (() => {

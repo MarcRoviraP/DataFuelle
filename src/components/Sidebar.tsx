@@ -436,7 +436,7 @@ export const Sidebar = () => {
               <div/ >
             ) : (
               <div className="bg-amber-50/70 p-3 rounded-2xl border border-amber-100/50 text-[11px] text-amber-700 leading-normal">
-                ⚠️ <strong>¡Sin vehículo activo!</strong> Agrega o selecciona un vehículo en tu garaje arriba para calcular el costo real de viaje. Actualmente se usa una aproximación genérica basada en la distancia.
+                ⚠️ <strong>¡Sin vehículo activo!</strong> {user ? 'Añade o selecciona un vehículo en tu garaje arriba para calcular el coste real de viaje.' : 'Inicia sesión para añadir tu vehículo y calcular el coste real de viaje.'} Actualmente se usa una aproximación genérica basada en la distancia.
               </div>
             )}
           </section>

@@ -3,9 +3,10 @@ import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
 import { useAppStore } from '../store/useAppStore'
 import { StationCard } from './StationCard'
 import { LoadingSkeleton } from './LoadingSkeleton'
+import { Maximize2, Minimize2 } from 'lucide-react'
 
 export const StationList = () => {
-  const { filteredStations, isLoading, selectedStationId, setSelectedStationId, setViewMode, viewMode } = useAppStore()
+  const { filteredStations, isLoading, selectedStationId, setSelectedStationId, setViewMode, viewMode, isListExpanded, setIsListExpanded } = useAppStore()
   const virtuosoRef = useRef<VirtuosoHandle>(null)
 
   // Auto-scroll to selected station when it changes (e.g. from map click)
@@ -57,6 +58,15 @@ export const StationList = () => {
             {filteredStations.length}
           </span>
         </h2>
+        
+        {/* Desktop Expand Button */}
+        <button
+          onClick={() => setIsListExpanded(!isListExpanded)}
+          className="hidden xl:flex items-center justify-center p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors active:scale-95"
+          title={isListExpanded ? "Contraer lista" : "Expandir lista"}
+        >
+          {isListExpanded ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+        </button>
       </div>
 
       <div className="flex-1 min-h-0 bg-slate-50">

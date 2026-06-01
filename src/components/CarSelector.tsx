@@ -18,7 +18,8 @@ export const CarSelector = ({ onClose }: CarSelectorProps) => {
   const [customConsumo, setCustomConsumo] = useState('')
   const [models, setModels] = useState<Car[]>([])
   const [loading, setLoading] = useState(false)
-  const [search, setSearch] = useState('')
+  const [makeSearch, setMakeSearch] = useState('')
+  const [modelSearch, setModelSearch] = useState('')
   const [selectedMake, setSelectedMake] = useState('')
 
   // Cache
@@ -80,7 +81,7 @@ export const CarSelector = ({ onClose }: CarSelectorProps) => {
       if (error) throw error
       setModels(data as Car[])
       setStep('model')
-      setSearch('')
+      setModelSearch('')
     } catch (err: any) {
       clearTimeout(timeoutId)
       if (err.name === 'AbortError') {
@@ -93,8 +94,8 @@ export const CarSelector = ({ onClose }: CarSelectorProps) => {
     }
   }
 
-  const filteredMakes = makes.filter(m => m.toLowerCase().includes(search.toLowerCase()))
-  const filteredModels = models.filter(m => m.model.toLowerCase().includes(search.toLowerCase()))
+  const filteredMakes = makes.filter(m => m.toLowerCase().includes(makeSearch.toLowerCase()))
+  const filteredModels = models.filter(m => m.model.toLowerCase().includes(modelSearch.toLowerCase()))
 
   const handleSelectCar = (car: Car) => {
     addUserCar(car)
@@ -126,8 +127,8 @@ export const CarSelector = ({ onClose }: CarSelectorProps) => {
                 type="text"
                 placeholder={step === 'make' ? "Buscar marca..." : "Buscar modelo..."}
                 className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:outline-none focus:border-blue-500 transition-all font-semibold"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                value={step === 'make' ? makeSearch : modelSearch}
+                onChange={(e) => step === 'make' ? setMakeSearch(e.target.value) : setModelSearch(e.target.value)}
                 autoFocus
               />
             </div>
