@@ -239,21 +239,21 @@ export const MapView = () => {
   }, [currentLocation?.lat, currentLocation?.lon, radius])
 
   // Memoize average price and icon generator to avoid overhead during sweep
-  const prices = useMemo(() => filteredStations.map(s => s.precioCombustible).filter(p => p > 0), [filteredStations])
+  const prices = useMemo(() => filteredStations.map(s => Number(s.precioCombustible)).filter(p => p > 0 && !isNaN(p)), [filteredStations])
   const averagePrice = useMemo(() => prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : 0, [prices])
 
   // Use a ref for average price to avoid re-creating icon functions (which tears down the cluster group)
   const avgPriceRef = useRef(averagePrice)
-  useEffect(() => {
+  // Update synchronously during render so icons get the correct average immediately
+  if (avgPriceRef.current !== averagePrice) {
     avgPriceRef.current = averagePrice
-  }, [averagePrice])
+  }
 
   // Icon Cache to prevent flickering
   const iconCache = useRef<Map<string, L.DivIcon>>(new Map())
 
-  const getPriceIcon = useCallback((price: number, isSelected: boolean) => {
+  const getPriceIcon = useCallback((price: number, isSelected: boolean, currentAvg: number) => {
     let color = '#64748b' // Default slate
-    const currentAvg = avgPriceRef.current
     
     if (price > 0 && currentAvg > 0) {
       if (price < currentAvg * 0.98) color = '#16a34a' // Green (Cheap)
@@ -516,7 +516,7 @@ export const MapView = () => {
             <Marker
               key={station.idEstacion}
               position={[station.latitud, station.longitud]}
-              icon={getPriceIcon(station.precioCombustible, false)}
+              icon={getPriceIcon(station.precioCombustible, false, averagePrice)}
               // @ts-ignore - custom property for cluster logic
               stationPrice={station.precioCombustible}
               ref={(ref) => {

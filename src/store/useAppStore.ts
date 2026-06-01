@@ -214,7 +214,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   setStations: (newStations) => {
     const { currentLocation, stations: currentStations, priceChanges } = get()
     
-    const mergedStationsMap = new Map(currentStations.map(s => [s.idEstacion, s]))
+    const currentStationsMap = new Map(currentStations.map(s => [s.idEstacion, s]))
+    const nextStations = []
 
     for (const newS of newStations) {
       const change = priceChanges.get(newS.idEstacion)
@@ -226,7 +227,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         ? calculateDistance(currentLocation.lat, currentLocation.lon, newS.latitud, newS.longitud) 
         : newS.distancia
 
-      const existing = mergedStationsMap.get(newS.idEstacion)
+      const existing = currentStationsMap.get(newS.idEstacion)
       
       // Keep existing reference if core data hasn't changed to avoid React re-renders
       if (
@@ -235,10 +236,11 @@ export const useAppStore = create<AppState>((set, get) => ({
         existing.distancia === dist &&
         existing.diff === diff
       ) {
-        continue // Already in map with correct reference
+        nextStations.push(existing)
+        continue
       }
 
-      mergedStationsMap.set(newS.idEstacion, {
+      nextStations.push({
         ...newS,
         distancia: dist,
         precioBase: newS.precioCombustible,
@@ -248,7 +250,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       })
     }
 
-    set({ stations: Array.from(mergedStationsMap.values()) })
+    set({ stations: nextStations })
     get().updateFilteredStations()
   },
 
