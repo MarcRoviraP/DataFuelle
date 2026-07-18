@@ -543,9 +543,6 @@ export const Sidebar = () => {
           </label>
         </section>
 
-        {/* Predicción Inteligente */}
-        <SmartPrediction />
-
         {/* Brands Section */}
         <section className="space-y-4 pt-2 border-t border-slate-100">
           <div className="flex items-center gap-2 text-slate-800 font-bold px-1 border-l-4 border-blue-500">
