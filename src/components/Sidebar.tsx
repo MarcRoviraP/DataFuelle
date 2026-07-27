@@ -3,7 +3,6 @@ import { useAppStore } from '../store/useAppStore'
 import { fetchSuggestions, geocodeAddress } from '../utils/geo'
 import { Search, MapPin, Fuel, Navigation, History, Filter, X, Tag, LogIn, LogOut, Zap, ArrowUpDown, Car } from 'lucide-react'
 import { Garage } from './Garage'
-import { SmartPrediction } from './SmartPrediction'
 const RADIUS_STEPS = [
   ...Array.from({ length: 50 }, (_, i) => i + 1),
   100, 200, 300, 400, 500, 750, 1000, 1250, 1500, 2000

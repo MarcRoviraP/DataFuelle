@@ -1,6 +1,6 @@
 import { useState, memo, useRef, useMemo } from 'react'
 import { fetchStationHistory, type Station } from '../services/api'
-import { MapPin, Clock, Navigation, Tag, Calendar, TrendingUp, ChevronDown, ChevronUp, Heart } from 'lucide-react'
+import { MapPin, Clock, Navigation, Tag, Calendar, TrendingUp, ChevronDown, ChevronUp, Heart, Zap } from 'lucide-react'
 import { shouldShowLastUpdate, formatLastUpdate } from '../utils/date'
 import { formatDistance } from '../utils/geo'
 import { useAppStore } from '../store/useAppStore'
@@ -50,7 +50,8 @@ export const StationCard = memo(({ station, isSelected, onClick }: StationCardPr
     setHistoryData([])
     
     try {
-      const data = await fetchStationHistory(station.idEstacion, days, (chunkData) => {
+      const fetchDays = days === null ? null : Math.max(days, 30);
+      const data = await fetchStationHistory(station.idEstacion, fetchDays, (chunkData) => {
         if (rid === fetchRequestId.current) {
           setHistoryData(chunkData)
           setLoadingHistory(false)
@@ -72,6 +73,8 @@ export const StationCard = memo(({ station, isSelected, onClick }: StationCardPr
   const handleTab = async (days: number | null) => {
     if (days === activeDays) return
     setActiveDays(days)
+    // If we already have 30 days (or all) of history loaded, we might not even need to re-fetch!
+    // But since fetchStationHistory is cached well, let's keep it simple.
     await loadHistory(days)
   }
 
@@ -81,10 +84,17 @@ export const StationCard = memo(({ station, isSelected, onClick }: StationCardPr
     window.open(url, '_blank')
   }
 
+  const visibleHistoryData = useMemo(() => {
+    if (activeDays === null) return historyData;
+    const since = new Date();
+    since.setDate(since.getDate() - activeDays);
+    return historyData.filter(d => new Date(d.recorded_at) >= since);
+  }, [historyData, activeDays]);
+
   // Trend badge: last vs first in the current window
-  const trendBadge = historyData.length > 1 ? (() => {
-    const first = Number(historyData[0][fuelKey])
-    const last  = Number(historyData[historyData.length - 1][fuelKey])
+  const trendBadge = visibleHistoryData.length > 1 ? (() => {
+    const first = Number(visibleHistoryData[0][fuelKey])
+    const last  = Number(visibleHistoryData[visibleHistoryData.length - 1][fuelKey])
     const diff  = last - first
     const color = diff > 0 ? 'bg-red-100 text-red-600' : diff < 0 ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-500'
     const icon  = diff > 0 ? '▲' : diff < 0 ? '▼' : '='
@@ -93,7 +103,7 @@ export const StationCard = memo(({ station, isSelected, onClick }: StationCardPr
 
   // Memoize chart data to stabilize reference across renders
   const chartData = useMemo(() => {
-    return historyData
+    return visibleHistoryData
       .filter(d => d[fuelKey] !== null && d[fuelKey] !== undefined && Number(d[fuelKey]) >= 0.1)
       .map(d => {
         try {
@@ -108,6 +118,90 @@ export const StationCard = memo(({ station, isSelected, onClick }: StationCardPr
         }
       })
       .filter((item): item is { time: string; value: number } => item !== null)
+  }, [historyData, fuelKey])
+
+  const cheapestDay = useMemo(() => {
+    if (historyData.length === 0) return null;
+    
+    // 1. Group data by week (0 to 3, where 0 is most recent week 0-7 days ago)
+    const now = new Date().getTime();
+    
+    // Array of 4 weeks, each containing an array of 7 days (0=Sunday...6=Saturday), storing prices
+    const weeksData = Array.from({ length: 4 }, () => 
+      Array.from({ length: 7 }, () => [] as number[])
+    );
+    
+    historyData.forEach(d => {
+      const price = Number(d[fuelKey]);
+      if (price >= 0.1) {
+        const date = new Date(d.recorded_at);
+        const time = date.getTime();
+        if (!isNaN(time)) {
+          const deltaDays = (now - time) / (1000 * 60 * 60 * 24);
+          if (deltaDays <= 28) { // Only last 4 weeks
+            const weekIdx = Math.floor(deltaDays / 7);
+            if (weekIdx >= 0 && weekIdx < 4) {
+              const day = date.getDay();
+              weeksData[weekIdx][day].push(price);
+            }
+          }
+        }
+      }
+    });
+
+    const dayWeights = [0, 0, 0, 0, 0, 0, 0];
+    // Weights: week 0 (most recent) = 1.0, week 1 = 0.83, week 2 = 0.66, week 3 (oldest) = 0.5
+    const weights = [1.0, 0.83, 0.66, 0.5];
+
+    // For each week, find the cheapest day
+    for (let w = 0; w < 4; w++) {
+      let minAvg = Infinity;
+      let minDay = -1;
+      
+      for (let day = 0; day < 7; day++) {
+        const prices = weeksData[w][day];
+        if (prices.length > 0) {
+          const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+          if (avg < minAvg) {
+            minAvg = avg;
+            minDay = day;
+          }
+        }
+      }
+      
+      if (minDay !== -1) {
+        dayWeights[minDay] += weights[w];
+      }
+    }
+
+    let bestDay = -1;
+    let maxWeight = -1;
+    for (let i = 0; i < 7; i++) {
+      if (dayWeights[i] > maxWeight && dayWeights[i] > 0) {
+        maxWeight = dayWeights[i];
+        bestDay = i;
+      }
+    }
+
+    let savingDiff = 0;
+    if (bestDay !== -1) {
+      const bestDayPrices = weeksData[0][bestDay];
+      const otherPrices: number[] = [];
+      for (let i = 0; i < 7; i++) {
+        if (i !== bestDay) {
+          otherPrices.push(...weeksData[0][i]);
+        }
+      }
+      if (bestDayPrices.length > 0 && otherPrices.length > 0) {
+        const bestAvg = bestDayPrices.reduce((a, b) => a + b, 0) / bestDayPrices.length;
+        const otherAvg = otherPrices.reduce((a, b) => a + b, 0) / otherPrices.length;
+        savingDiff = bestAvg - otherAvg;
+      }
+    }
+
+    if (bestDay === -1) return null;
+    const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    return { name: dayNames[bestDay], diff: savingDiff };
   }, [historyData, fuelKey])
 
   return (
@@ -250,9 +344,22 @@ export const StationCard = memo(({ station, isSelected, onClick }: StationCardPr
               <LightweightChart 
                 data={chartData} 
               />
-              <p className="text-[9px] text-slate-400 text-right mt-1">
-                {historyData.length} registros
-              </p>
+              <div className="flex justify-between items-center mt-2">
+                {cheapestDay ? (
+                  <div className="flex items-center gap-1.5 text-[10px] text-blue-700 font-bold bg-blue-50 px-2 py-1.5 rounded-lg border border-blue-100 shadow-sm transition-all hover:bg-blue-100 cursor-help" title="Basado en el análisis del patrón histórico de precios">
+                    <Zap size={12} className="text-blue-500 fill-blue-500 animate-pulse" />
+                    <span>Mejor día: <span className="font-black uppercase">{cheapestDay.name}</span></span>
+                    {cheapestDay.diff !== 0 && (
+                      <span className={`ml-0.5 px-1 py-0.5 rounded ${cheapestDay.diff < 0 ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800'}`} title="Diferencia con la media del resto de la última semana">
+                        {cheapestDay.diff > 0 ? '+' : ''}{cheapestDay.diff.toFixed(3)}€
+                      </span>
+                    )}
+                  </div>
+                ) : <div />}
+                <p className="text-[9px] text-slate-400 text-right">
+                  {historyData.length} registros
+                </p>
+              </div>
             </>
           ) : (
             <div className="h-16 flex items-center justify-center text-[10px] text-slate-400 border-2 border-dashed border-slate-200 rounded-lg">
