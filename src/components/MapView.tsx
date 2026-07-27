@@ -358,8 +358,7 @@ export const MapView = () => {
     { id: 6,  label: 'Diesel', key: 'precioDiesel' as const, color: '#b45309' },
   ] as const
 
-  // Detect system color scheme preference
-  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+  // Detect system color scheme preference is no longer used for the default map layer
 
   const [initialCenter] = useState<[number, number]>(() => {
     try {
@@ -390,7 +389,7 @@ export const MapView = () => {
       const stored = localStorage.getItem('datafuelle_map_layer')
       if (stored) return stored
     } catch {}
-    return prefersDark ? 'Oscuro' : 'Callejero'
+    return 'Callejero'
   })
 
   return (
