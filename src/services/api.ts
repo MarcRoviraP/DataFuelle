@@ -29,6 +29,12 @@ export interface Station {
   delta_pct?: number
   precioAnterior?: number
   lastUpdate: string
+  // Cost calculations
+  estimatedCost?: number
+  travelCost?: number
+  refuelCost?: number
+  isBestOption?: boolean
+  savingsVsNearest?: number
 }
 
 const MITECO_URL = 'https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestres/'

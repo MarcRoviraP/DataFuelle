@@ -186,7 +186,7 @@ const cartoKey = import.meta.env.CARTO_MAPS_KEY || import.meta.env.VITE_CARTO_MA
 const cartoKeyParam = cartoKey ? `?key=${cartoKey}` : ''
 
 export const MapView = () => {
-  const { filteredStations, currentLocation, selectedFuelTypeId, selectedStationId, stationDiscounts, radius, isLoading, favoriteStationIds, routeCoordinates, routeInfo, clearRoute } = useAppStore()
+  const { filteredStations, currentLocation, selectedFuelTypeId, selectedStationId, stationDiscounts, radius, isLoading, favoriteStationIds, routeCoordinates, routeInfo, clearRoute, refuelLiters } = useAppStore()
   const [visualRadius, setVisualRadius] = useState<number>(0)
   const defaultCenter: [number, number] = [39.4699, -0.3763]
   const markerRefs = useRef<Map<number, L.Marker>>(new Map())
@@ -648,6 +648,30 @@ export const MapView = () => {
                       )
                     })}
                   </div>
+
+                  {station.estimatedCost !== undefined && station.estimatedCost > 0 && (
+                    <div style={{
+                      margin: '0 0 8px 0',
+                      padding: '6px 8px',
+                      borderRadius: 8,
+                      background: station.isBestOption ? '#ecfdf5' : '#f8fafc',
+                      border: station.isBestOption ? '1px solid #a7f3d0' : '1px solid #e2e8f0',
+                      fontSize: 11,
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 800 }}>
+                        <span style={{ color: station.isBestOption ? '#047857' : '#475569' }}>
+                          {station.isBestOption ? '★ Opción más rentable:' : 'Coste total estimado:'}
+                        </span>
+                        <span style={{ color: station.isBestOption ? '#065f46' : '#0f172a', fontSize: 12 }}>
+                          {station.estimatedCost.toFixed(2)} €
+                        </span>
+                      </div>
+                      <div style={{ color: '#64748b', fontSize: 10, marginTop: 2, display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Combustible ({refuelLiters}L): {station.refuelCost?.toFixed(2)}€</span>
+                        <span>Viaje: {station.travelCost?.toFixed(2)}€</span>
+                      </div>
+                    </div>
+                  )}
 
                   <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.5, marginBottom: 10 }}>
                     <p>{station.direccion}</p>

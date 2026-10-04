@@ -44,6 +44,10 @@ interface AppState {
   setSortBy: (sortBy: 'smart' | 'distance' | 'price') => void
   refuelLiters: number
   setRefuelLiters: (liters: number) => void
+  vehicleConsumption: number
+  setVehicleConsumption: (consumption: number) => void
+  isRoundTrip: boolean
+  setIsRoundTrip: (isRoundTrip: boolean) => void
   showOnlyOpen: boolean
   setShowOnlyOpen: (open: boolean) => void
   showOnlyUpdatedToday: boolean
@@ -189,6 +193,37 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ refuelLiters: liters })
     try {
       localStorage.setItem('datafuelle_refuel_liters', liters.toString())
+    } catch {}
+    get().updateFilteredStations()
+  },
+  vehicleConsumption: (() => {
+    try {
+      const stored = localStorage.getItem('datafuelle_vehicle_consumption')
+      if (stored) {
+        const parsed = parseFloat(stored)
+        if (!isNaN(parsed) && parsed > 0) return parsed
+      }
+    } catch {}
+    return 6.5
+  })(),
+  setVehicleConsumption: (consumption) => {
+    set({ vehicleConsumption: consumption })
+    try {
+      localStorage.setItem('datafuelle_vehicle_consumption', consumption.toString())
+    } catch {}
+    get().updateFilteredStations()
+  },
+  isRoundTrip: (() => {
+    try {
+      const stored = localStorage.getItem('datafuelle_round_trip')
+      if (stored !== null) return stored === 'true'
+    } catch {}
+    return true
+  })(),
+  setIsRoundTrip: (isRoundTrip) => {
+    set({ isRoundTrip })
+    try {
+      localStorage.setItem('datafuelle_round_trip', isRoundTrip.toString())
     } catch {}
     get().updateFilteredStations()
   },
@@ -466,9 +501,12 @@ export const useAppStore = create<AppState>((set, get) => ({
           }
         })
         const defaultCar = cars.find(c => c.is_default)
+        const selectedId = defaultCar?.id || (cars.length > 0 ? cars[0].id : null)
+        const activeCar = cars.find(c => c.id === selectedId)
         set({ 
           userCars: cars,
-          selectedCarId: defaultCar?.id || (cars.length > 0 ? cars[0].id : null)
+          selectedCarId: selectedId,
+          ...(activeCar && activeCar.consumo_l_100km > 0 ? { vehicleConsumption: activeCar.consumo_l_100km } : {})
         })
       }
     } catch (error) {
@@ -552,6 +590,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         await query
       }
 
+      if (id) {
+        const found = get().userCars.find(c => c.id === id)
+        if (found && found.consumo_l_100km > 0) {
+          get().setVehicleConsumption(found.consumo_l_100km)
+        }
+      }
+
       await get().fetchUserCars()
       get().updateFilteredStations()
     } catch (error) {
@@ -560,23 +605,40 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   updateFilteredStations: () => {
-    const { stations, radius, selectedBrands, sortBy, showOnlyOpen, showOnlyUpdatedToday, stationDiscounts, userCars, selectedCarId, showOnlyFavorites, favoriteStationIds, refuelLiters, activeSEOFilter } = get()
+    const { stations, radius, selectedBrands, sortBy, showOnlyOpen, showOnlyUpdatedToday, stationDiscounts, showOnlyFavorites, favoriteStationIds, refuelLiters, vehicleConsumption, isRoundTrip, activeSEOFilter } = get()
     
     const currentFilteredMap = new Map(get().filteredStations.map(s => [s.idEstacion, s]))
+
+    const liters = refuelLiters > 0 ? refuelLiters : 35
+    const consumption = vehicleConsumption > 0 ? vehicleConsumption : 6.5
+    const tripMultiplier = isRoundTrip ? 2 : 1
 
     let filtered = stations.map(s => {
       const discount = stationDiscounts.get(s.idEstacion) || 0
       const newPrecio = (s.precioBase || 0) - discount
+      const dist = s.distancia || 0
+      const tripDistance = dist * tripMultiplier
+      const travelLiters = tripDistance * (consumption / 100)
+      const travelCost = Number((travelLiters * newPrecio).toFixed(2))
+      const refuelCost = Number((liters * newPrecio).toFixed(2))
+      const estimatedCost = Number((refuelCost + travelCost).toFixed(2))
       
       const existing = currentFilteredMap.get(s.idEstacion)
-      // Reutiliza la referencia en memoria si el precio y la distancia son idénticos
-      if (existing && existing.precioCombustible === newPrecio && existing.distancia === s.distancia) {
+      if (
+        existing &&
+        existing.precioCombustible === newPrecio &&
+        existing.distancia === dist &&
+        existing.estimatedCost === estimatedCost
+      ) {
         return existing
       }
       
       return {
         ...s,
-        precioCombustible: newPrecio
+        precioCombustible: newPrecio,
+        travelCost,
+        refuelCost,
+        estimatedCost,
       }
     }).filter(s => (s.precioBase || 0) > 0)
 
@@ -610,25 +672,23 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Filter by Open Now
     if (showOnlyOpen) {
       const now = new Date()
-      // day of week: 1 (Mon) - 7 (Sun)
       const currentTime = now.getHours() * 100 + now.getMinutes()
       
       filtered = filtered.filter(s => {
         const horario = s.horario?.toUpperCase() || ''
         if (horario.includes('24H')) return true
         
-        // Match HH:MM-HH:MM
         const match = horario.match(/(\d{2}):(\d{2})-(\d{2}):(\d{2})/)
         if (match) {
           const start = parseInt(match[1]) * 100 + parseInt(match[2])
           const end = parseInt(match[3]) * 100 + parseInt(match[4])
           
-          if (end < start) { // Over midnight
+          if (end < start) {
             return currentTime >= start || currentTime <= end
           }
           return currentTime >= start && currentTime <= end
         }
-        return true // Default if unparseable
+        return true
       })
     }
 
@@ -642,91 +702,69 @@ export const useAppStore = create<AppState>((set, get) => ({
       })
     }
 
+    // Calculate comparative metrics: find nearest station and lowest estimated cost
+    const validStationsWithDist = filtered.filter(s => typeof s.distancia === 'number' && s.distancia >= 0)
+    let nearestStation: Station | undefined
+    if (validStationsWithDist.length > 0) {
+      nearestStation = validStationsWithDist.reduce((prev, curr) => 
+        (curr.distancia ?? Infinity) < (prev.distancia ?? Infinity) ? curr : prev
+      )
+    }
+
+    let minEstimatedCost = Infinity
+    filtered.forEach(s => {
+      if (s.estimatedCost !== undefined && s.estimatedCost > 0 && s.estimatedCost < minEstimatedCost) {
+        minEstimatedCost = s.estimatedCost
+      }
+    })
+
+    filtered = filtered.map(s => {
+      const isBest = s.estimatedCost !== undefined && s.estimatedCost > 0 && s.estimatedCost === minEstimatedCost
+      let savingsVsNearest: number | undefined
+      if (nearestStation && nearestStation.estimatedCost !== undefined && s.estimatedCost !== undefined) {
+        savingsVsNearest = Number((nearestStation.estimatedCost - s.estimatedCost).toFixed(2))
+      }
+      return {
+        ...s,
+        isBestOption: isBest,
+        savingsVsNearest,
+      }
+    })
+
     // Sorting
     if (sortBy === 'smart' && filtered.length > 0) {
-      const selectedCar = userCars.find(c => c.id === selectedCarId)
-      
-      if (selectedCar && selectedCar.consumo_l_100km > 0) {
-        // Advanced Smart Filter: Based on REAL COST (Fuel + Time)
-        const consumo_km = selectedCar.consumo_l_100km / 100
-        const LITROS_REPOSTAJE_ESTIMADO = refuelLiters || 35 // Usar los litros indicados por el usuario
-        const VALOR_TIEMPO_HORA = 12 // €/hora (costo de oportunidad)
-        const VELOCIDAD_MEDIA_KMH = 35 // km/h (estimación urbana/mixta)
-
-        const scoredStations = filtered.map(s => {
-          const dist = s.distancia || 0
-          const precio = s.precioCombustible || 9.99
-          
-          // Coste de combustible (ir y volver)
-          const costeCombustibleViaje = dist * 2 * precio * consumo_km
-          // Coste de tiempo (estimado)
-          const tiempoViajeHoras = (dist * 2) / VELOCIDAD_MEDIA_KMH
-          const costeTiempo = tiempoViajeHoras * VALOR_TIEMPO_HORA
-          
-          // Gasto Total = Precio del combustible + Gasto de viaje + Coste de tiempo
-          const gastoTotal = (precio * LITROS_REPOSTAJE_ESTIMADO) + costeCombustibleViaje + costeTiempo
-          
-          return { station: s, score: gastoTotal }
-        })
-
-        scoredStations.sort((a, b) => a.score - b.score)
-        filtered = scoredStations.map(item => item.station)
-      } else {
-        // Fallback to basic smart normalization with HEAVY distance weight
-        const distances = filtered.map(s => s.distancia || 0)
-        const prices = filtered.map(s => s.precioCombustible || 9.99)
-
-        const minDist = Math.min(...distances)
-        const maxDist = Math.max(...distances)
-        const minPrice = Math.min(...prices)
-        const maxPrice = Math.max(...prices)
-
-        // Normalización con "colchón" para que diferencias de 1-2 céntimos no pesen tanto
-        const norm = (val: number, min: number, max: number, margin = 0) => {
-          const range = max - min
-          if (range <= margin) return 0
-          return (val - min) / range
-        }
-
-        const scoredStations = filtered.map(s => {
-          // Le damos 70% de peso a la distancia y 30% al precio
-          const dScore = norm(s.distancia || 0, minDist, maxDist)
-          // Usamos un margen de 0.03€ para que variaciones pequeñas no disparen el score
-          const pScore = norm(s.precioCombustible || 9.99, minPrice, maxPrice, 0.03)
-          
-          return { station: s, score: dScore * 0.7 + pScore * 0.3 }
-        })
-
-        scoredStations.sort((a, b) => a.score - b.score)
-        filtered = scoredStations.map(item => item.station)
-      }
+      filtered.sort((a, b) => {
+        const costA = a.estimatedCost ?? 99999
+        const costB = b.estimatedCost ?? 99999
+        if (costA !== costB) return costA - costB
+        return (a.distancia || 0) - (b.distancia || 0)
+      })
+    } else if (sortBy === 'price') {
+      filtered.sort((a, b) => {
+        const priceA = a.precioCombustible || 999
+        const priceB = b.precioCombustible || 999
+        if (priceA !== priceB) return priceA - priceB
+        return (a.distancia || 0) - (b.distancia || 0)
+      })
     } else {
       filtered.sort((a, b) => {
-        if (sortBy === 'price') {
-          const priceA = a.precioCombustible || 999
-          const priceB = b.precioCombustible || 999
-          if (priceA !== priceB) return priceA - priceB
-          return (a.distancia || 0) - (b.distancia || 0)
-        } else {
-          return (a.distancia || 0) - (b.distancia || 0)
-        }
+        return (a.distancia || 0) - (b.distancia || 0)
       })
     }
 
-    // 🔥 VIRTUALIZACIÓN / LÍMITE:
-    // Nunca renderizar más de 1500 estaciones a la vez para evitar congelamientos en el DOM
-    // tanto en la lista de estaciones como en el MarkerCluster de Leaflet.
-    // Como la lista ya está ordenada (por smart, precio o distancia), el usuario siempre
-    // verá las 1500 "mejores" opciones, lo cual es más que suficiente.
     const MAX_RENDER_STATIONS = 1500
     if (filtered.length > MAX_RENDER_STATIONS) {
       filtered = filtered.slice(0, MAX_RENDER_STATIONS)
     }
 
     const currentFiltered = get().filteredStations
-    // Pure data comparison to avoid reference changes if content is identical
     const isIdentical = filtered.length === currentFiltered.length && 
-      filtered.every((s, i) => s.idEstacion === currentFiltered[i].idEstacion && s.precioCombustible === currentFiltered[i].precioCombustible)
+      filtered.every((s, i) => 
+        s.idEstacion === currentFiltered[i].idEstacion && 
+        s.precioCombustible === currentFiltered[i].precioCombustible &&
+        s.estimatedCost === currentFiltered[i].estimatedCost &&
+        s.isBestOption === currentFiltered[i].isBestOption
+      )
 
     if (!isIdentical) {
       set({ filteredStations: filtered })

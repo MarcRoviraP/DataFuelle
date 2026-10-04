@@ -33,6 +33,8 @@ export const StationCard = memo(({ station, isSelected, onClick }: StationCardPr
   const selectedFuelTypeId = useAppStore(state => state.selectedFuelTypeId)
   const favoriteStationIds = useAppStore(state => state.favoriteStationIds)
   const toggleFavorite = useAppStore(state => state.toggleFavorite)
+  const refuelLiters = useAppStore(state => state.refuelLiters)
+  const isRoundTrip = useAppStore(state => state.isRoundTrip)
   const isFav = favoriteStationIds.includes(station.idEstacion)
 
   const [showHistory, setShowHistory] = useState(false)
@@ -207,7 +209,11 @@ export const StationCard = memo(({ station, isSelected, onClick }: StationCardPr
   return (
     <div
       className={`p-4 rounded-xl border-2 transition-all cursor-pointer hover:shadow-lg ${
-        isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-100 bg-white'
+        isSelected 
+          ? 'border-blue-500 bg-blue-50' 
+          : station.isBestOption
+          ? 'border-emerald-300 bg-emerald-50/20 shadow-sm'
+          : 'border-gray-100 bg-white'
       }`}
       onClick={onClick}
     >
@@ -301,6 +307,48 @@ export const StationCard = memo(({ station, isSelected, onClick }: StationCardPr
           {showHistory ? <ChevronUp size={12} className="text-blue-600" /> : <ChevronDown size={12} className="text-blue-600" />}
         </button>
       </div>
+
+      {/* Estimated Cost Breakdown */}
+      {station.estimatedCost !== undefined && station.estimatedCost > 0 && (
+        <div className={`mb-3 p-2.5 rounded-xl border text-xs transition-all ${
+          station.isBestOption 
+            ? 'bg-emerald-50/80 border-emerald-300 text-emerald-950 shadow-sm'
+            : 'bg-slate-50 border-slate-200/80 text-slate-800'
+        }`}>
+          <div className="flex items-center justify-between font-bold">
+            <div className="flex items-center gap-1.5">
+              {station.isBestOption ? (
+                <span className="bg-emerald-600 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-md tracking-wider flex items-center gap-1">
+                  <Zap size={10} fill="currentColor" /> Opción más rentable
+                </span>
+              ) : (
+                <span className="text-[11px] font-black text-slate-600 uppercase tracking-tight">
+                  Coste total estimado:
+                </span>
+              )}
+            </div>
+            <span className={`text-sm font-black ${station.isBestOption ? 'text-emerald-700' : 'text-slate-900'}`}>
+              {station.estimatedCost.toFixed(2)} €
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between text-[10px] text-slate-500 font-semibold mt-1.5 pt-1.5 border-t border-slate-200/50">
+            <span>
+              Combustible ({refuelLiters}L): <strong className="text-slate-700">{station.refuelCost?.toFixed(2)}€</strong>
+            </span>
+            <span>·</span>
+            <span>
+              Viaje ({isRoundTrip ? '2×' : '1×'} {formatDistance(station.distancia ?? 0)}): <strong className="text-slate-700">{station.travelCost?.toFixed(2)}€</strong>
+            </span>
+          </div>
+
+          {station.savingsVsNearest !== undefined && station.savingsVsNearest > 0.05 && (
+            <div className="mt-1.5 text-[10px] font-black text-emerald-700 bg-emerald-100/60 px-2 py-0.5 rounded-md flex items-center gap-1 w-max">
+              <span>✓ Ahorras {station.savingsVsNearest.toFixed(2)} € respecto a la más cercana</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* History Panel — SVG Line Chart */}
       {showHistory && (

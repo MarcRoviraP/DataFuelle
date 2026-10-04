@@ -35,6 +35,10 @@ export const Sidebar = () => {
     setSortBy,
     refuelLiters,
     setRefuelLiters,
+    vehicleConsumption,
+    setVehicleConsumption,
+    isRoundTrip,
+    setIsRoundTrip,
     userCars,
     selectedCarId,
   } = useAppStore()
@@ -390,9 +394,10 @@ export const Sidebar = () => {
               className={`flex-1 py-3 px-2 rounded-xl text-[10px] font-black uppercase tracking-tight transition-all flex items-center justify-center gap-1.5 ${
                 sortBy === 'smart' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:text-slate-600'
               }`}
+              title="Ordena por coste total (combustible + viaje)"
             >
               <Zap size={10} fill={sortBy === 'smart' ? "currentColor" : "none"} />
-              Smart
+              Más rentable
             </button>
             <button
               onClick={() => setSortBy('distance')}
@@ -413,43 +418,134 @@ export const Sidebar = () => {
           </div>
         </section>
 
-        {/* Refuel Liters Section */}
-        {sortBy === 'smart' && (
-          <section className="space-y-4 pt-2 border-t border-slate-100 animate-fadeIn">
-            <div className="flex justify-between items-center px-1">
-              <div className="flex items-center gap-2 text-slate-800 font-bold border-l-4 border-blue-500 pl-1">
-                <Fuel size={18} />
-                <h2>Litros a repostar</h2>
-              </div>
-              <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-black border border-blue-100">
-                {refuelLiters} L
-              </span>
+        {/* Cost & Consumption Estimation Filters */}
+        <section className="space-y-4 pt-2 border-t border-slate-100">
+          <div className="flex justify-between items-center px-1">
+            <div className="flex items-center gap-2 text-slate-800 font-bold border-l-4 border-blue-500 pl-1">
+              <Fuel size={18} />
+              <h2>Coste estimado y consumo</h2>
             </div>
-            <div className="px-2">
+            {sortBy === 'smart' && (
+              <span className="bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full text-[10px] font-black border border-emerald-100 uppercase tracking-tight">
+                Activo
+              </span>
+            )}
+          </div>
+
+          <div className="bg-slate-50/80 rounded-2xl p-3.5 border border-slate-200/70 space-y-3.5">
+            {/* Liters to refuel */}
+            <div>
+              <div className="flex justify-between items-center mb-1.5">
+                <span className="text-xs font-bold text-slate-700">Litros a repostar:</span>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    min="1"
+                    max="300"
+                    value={refuelLiters}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10)
+                      if (!isNaN(val) && val >= 1) setRefuelLiters(val)
+                    }}
+                    className="w-16 px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs font-black text-blue-600 text-center focus:outline-none focus:border-blue-500"
+                  />
+                  <span className="text-xs font-bold text-slate-400">L</span>
+                </div>
+              </div>
               <input
                 type="range"
                 min="5"
                 max="100"
                 step="5"
-                value={refuelLiters}
-                onChange={(e) => setRefuelLiters(parseInt(e.target.value))}
-                className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                value={Math.min(refuelLiters, 100)}
+                onChange={(e) => setRefuelLiters(parseInt(e.target.value, 10))}
+                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
               />
-              <div className="flex justify-between mt-2 text-[10px] font-bold text-slate-400 px-1 uppercase tracking-tighter">
-                <span>5 L</span>
-                <span>50 L</span>
-                <span>100 L</span>
+              <div className="flex gap-1.5 mt-2">
+                {[20, 35, 50, 65].map((l) => (
+                  <button
+                    key={l}
+                    type="button"
+                    onClick={() => setRefuelLiters(l)}
+                    className={`flex-1 py-1 text-[10px] font-black rounded-lg border transition-all ${
+                      refuelLiters === l
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                        : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'
+                    }`}
+                  >
+                    {l}L
+                  </button>
+                ))}
               </div>
             </div>
-            {selectedCar ? (
-              <div/ >
-            ) : (
-              <div className="bg-amber-50/70 p-3 rounded-2xl border border-amber-100/50 text-[11px] text-amber-700 leading-normal">
-                ⚠️ <strong>¡Sin vehículo activo!</strong> {user ? 'Añade o selecciona un vehículo en tu garaje arriba para calcular el coste real de viaje.' : 'Inicia sesión para añadir tu vehículo y calcular el coste real de viaje.'} Actualmente se usa una aproximación genérica basada en la distancia.
+
+            {/* Vehicle Consumption */}
+            <div className="pt-2 border-t border-slate-200/60">
+              <div className="flex justify-between items-center mb-1.5">
+                <div>
+                  <span className="text-xs font-bold text-slate-700 block">Consumo vehículo:</span>
+                  {selectedCar ? (
+                    <span className="text-[10px] text-blue-600 font-bold">
+                      🚗 {selectedCar.make} {selectedCar.model}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-slate-400">
+                      Media configurable
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="1"
+                    max="30"
+                    value={vehicleConsumption}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value)
+                      if (!isNaN(val) && val >= 0.1) setVehicleConsumption(val)
+                    }}
+                    className="w-16 px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs font-black text-blue-600 text-center focus:outline-none focus:border-blue-500"
+                  />
+                  <span className="text-[10px] font-bold text-slate-400">L/100km</span>
+                </div>
               </div>
-            )}
-          </section>
-        )}
+            </div>
+
+            {/* Trip mode: Round trip vs One-way */}
+            <div className="pt-2 border-t border-slate-200/60">
+              <div className="flex justify-between items-center mb-1.5">
+                <span className="text-xs font-bold text-slate-700">Cálculo de trayecto:</span>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5 bg-slate-200/60 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setIsRoundTrip(true)}
+                  className={`py-1.5 text-[10px] font-black rounded-lg transition-all ${
+                    isRoundTrip
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                  title="Calcula el coste de ir y volver de la gasolinera (2× distancia)"
+                >
+                  Ida y vuelta (2×)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsRoundTrip(false)}
+                  className={`py-1.5 text-[10px] font-black rounded-lg transition-all ${
+                    !isRoundTrip
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                  title="Calcula solo la ida en ruta (1× distancia)"
+                >
+                  Solo ida (1×)
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
 
         {/* Radius Section */}
         <section className="space-y-4 pt-2 border-t border-slate-100">

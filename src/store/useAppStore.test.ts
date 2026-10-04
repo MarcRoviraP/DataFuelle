@@ -109,3 +109,95 @@ describe('useAppStore - fetchRoute', () => {
     expect(state.activeRouteStationId).toBeNull()
   })
 })
+
+describe('useAppStore - cost estimation and smart profitability sorting', () => {
+  const dummyStationNear = {
+    idEstacion: 1,
+    nombreEstacion: 'Cercana pero cara',
+    direccion: 'Calle 1',
+    longitud: 0,
+    latitud: 0,
+    margen: 'D',
+    codPostal: '46001',
+    horario: '24H',
+    municipio: 'Valencia',
+    provincia: 'Valencia',
+    marca: 'Repsol',
+    precioCombustible: 1.60,
+    precioBase: 1.60,
+    precioG95: 1.60,
+    precioG98: null,
+    precioDiesel: null,
+    distancia: 2,
+    lastUpdate: '2026-10-04'
+  }
+
+  const dummyStationFar = {
+    idEstacion: 2,
+    nombreEstacion: 'Lejana pero muy barata',
+    direccion: 'Calle 2',
+    longitud: 0,
+    latitud: 0,
+    margen: 'D',
+    codPostal: '46002',
+    horario: '24H',
+    municipio: 'Valencia',
+    provincia: 'Valencia',
+    marca: 'Plenoil',
+    precioCombustible: 1.30,
+    precioBase: 1.30,
+    precioG95: 1.30,
+    precioG98: null,
+    precioDiesel: null,
+    distancia: 10,
+    lastUpdate: '2026-10-04'
+  }
+
+  it('calculates refuel cost, travel cost, and estimated cost accurately with round trip', () => {
+    useAppStore.setState({
+      stations: [dummyStationNear],
+      refuelLiters: 50,
+      vehicleConsumption: 6.0,
+      isRoundTrip: true,
+      sortBy: 'smart',
+      radius: 50,
+      selectedBrands: [],
+      showOnlyFavorites: false,
+      showOnlyOpen: false,
+      showOnlyUpdatedToday: false,
+      activeSEOFilter: null
+    })
+
+    useAppStore.getState().updateFilteredStations()
+    const [station] = useAppStore.getState().filteredStations
+
+    expect(station.refuelCost).toBe(80.00)
+    expect(station.travelCost).toBe(0.38)
+    expect(station.estimatedCost).toBe(80.38)
+    expect(station.isBestOption).toBe(true)
+  })
+
+  it('determines the most worthwhile station considering volume of refuel and travel consumption', () => {
+    useAppStore.setState({
+      stations: [dummyStationNear, dummyStationFar],
+      refuelLiters: 10,
+      vehicleConsumption: 6.0,
+      isRoundTrip: true,
+      sortBy: 'smart',
+      radius: 50,
+      selectedBrands: [],
+      showOnlyFavorites: false,
+      showOnlyOpen: false,
+      showOnlyUpdatedToday: false,
+      activeSEOFilter: null
+    })
+
+    useAppStore.getState().updateFilteredStations()
+    const stations = useAppStore.getState().filteredStations
+
+    expect(stations[0].idEstacion).toBe(2)
+    expect(stations[0].isBestOption).toBe(true)
+    expect(stations[0].savingsVsNearest).toBeCloseTo(1.82, 1)
+  })
+})
+
