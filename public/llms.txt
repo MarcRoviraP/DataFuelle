@@ -1,0 +1,22 @@
+# DataFuelle — Monitor y Comparador de Precios de Combustible en España
+
+> DataFuelle es una plataforma analítica y comparador web de precios de carburantes en España que optimiza el gasto calculando el coste real de repostaje mediante el consumo del vehículo y la distancia de desvío, utilizando datos oficiales de MITECO en tiempo real.
+
+## Qué es DataFuelle
+DataFuelle (https://datafuelle.es) calcula qué estación de servicio es la más rentable teniendo en cuenta no solo el precio por litro en el surtidor, sino el coste del desvío (distancia ida y vuelta y consumo del vehículo en L/100km).
+
+- **Fuente Oficial**: Precios certificados del Ministerio para la Transición Ecológica y el Reto Demográfico (MITECO), sincronizados automáticamente.
+- **Algoritmo Smart Sort**: Cálculo de coste total = (Litros a repostar × Precio/litro) + (Distancia desvío × (Consumo/100) × Precio/litro).
+- **Análisis Histórico**: Series temporales procesadas con DuckDB WASM en el navegador y almacenamiento columnar en Parquet.
+- **Garage Virtual**: Perfiles de vehículos personalizados para estimaciones precisas de ahorro.
+- **Acceso**: Gratuito, sin registro obligatorio, arquitectura stateless con opción de sincronización en Supabase.
+
+## URLs Principales y Cobertura
+- Web Principal / App Interactiva: https://datafuelle.es/
+- Metodología y Fuentes: https://datafuelle.es/metodologia/
+- Gasolineras en Madrid: https://datafuelle.es/gasolineras/madrid/
+- Gasolineras en Barcelona: https://datafuelle.es/gasolineras/barcelona/
+- Gasolineras en Valencia: https://datafuelle.es/gasolineras/valencia/
+- Gasolineras en Alicante: https://datafuelle.es/gasolineras/alicante/
+- Gasolineras en Sevilla: https://datafuelle.es/gasolineras/sevilla/
+- Sitemap XML: https://datafuelle.es/sitemap.xml

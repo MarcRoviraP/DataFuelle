@@ -1,0 +1,20 @@
+# Robots.txt for DataFuelle (https://datafuelle.es)
+
+User-agent: *
+Allow: /
+
+# Search & AI Retrieval Discovery Bots
+User-agent: Googlebot
+User-agent: Bingbot
+User-agent: OAI-SearchBot
+User-agent: PerplexityBot
+User-agent: Claude-SearchBot
+Allow: /
+
+# Model Training Bots (Opt-out from training while allowing search retrieval)
+User-agent: GPTBot
+User-agent: ClaudeBot
+User-agent: Google-Extended
+Disallow: /
+
+Sitemap: https://datafuelle.es/sitemap.xml

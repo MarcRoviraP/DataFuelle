@@ -1,15 +1,63 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/icono_datafuelle.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DataFuelle | Gasolineras Baratas y Comparador de Combustible en España</title>
+    <meta name="description" content="Encuentra las gasolineras más baratas de España en tiempo real con datos oficiales de MITECO. Calcula tu ahorro real considerando el consumo de tu vehículo y el desvío." />
+    <link rel="canonical" href="https://datafuelle.es/" />
+    
+    <!-- Open Graph / Redes / AI Crawlers -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://datafuelle.es/" />
+    <meta property="og:title" content="DataFuelle | Gasolineras Baratas y Comparador de Combustible" />
+    <meta property="og:description" content="Calcula el coste real de repostaje en España con datos oficiales MITECO y algoritmos de consumo inteligente." />
+    <meta property="og:image" content="https://datafuelle.es/icono_datafuelle.svg" />
+
     <link rel="preconnect" href="https://a.tile.openstreetmap.org" />
     <link rel="preconnect" href="https://b.tile.openstreetmap.org" />
     <link rel="preconnect" href="https://c.tile.openstreetmap.org" />
-    <title>DataFuelle</title>
+
+    <!-- Schema JSON-LD -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "https://datafuelle.es/#website",
+          "url": "https://datafuelle.es/",
+          "name": "DataFuelle",
+          "description": "Plataforma de análisis y consulta de precios de combustible en España con datos oficiales de MITECO",
+          "inLanguage": "es"
+        },
+        {
+          "@type": "WebApplication",
+          "@id": "https://datafuelle.es/#app",
+          "name": "DataFuelle",
+          "url": "https://datafuelle.es/",
+          "applicationCategory": "TravelApplication",
+          "operatingSystem": "All",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "EUR"
+          },
+          "description": "Calculador inteligente de coste de repostaje y monitor de gasolineras más económicas en España."
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
+    <noscript>
+      <div style="padding: 2rem; font-family: system-ui, sans-serif; max-width: 800px; margin: 0 auto;">
+        <h1>DataFuelle — Gasolineras Baratas en España</h1>
+        <p>DataFuelle analiza los precios oficiales de carburantes del Ministerio para la Transición Ecológica (MITECO) y calcula el coste real de repostar en función del consumo de tu coche y los kilómetros de desvío.</p>
+        <p>Para utilizar la experiencia interactiva con mapas dinámicos y DuckDB WASM, activa JavaScript en tu navegador.</p>
+      </div>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

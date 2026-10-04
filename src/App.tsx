@@ -35,8 +35,8 @@ function App() {
   useEffect(() => {
     const store = useAppStore.getState()
 
-    // Detectar si la ruta actual es una landing SEO local
-    const match = currentPath.match(/^\/gasolineras-baratas\/([^/]+)(?:\/([^/]+))?$/)
+    // Detectar si la ruta actual es una landing SEO local (/gasolineras/... o /gasolineras-baratas/...)
+    const match = currentPath.match(/^\/(?:gasolineras|gasolineras-baratas)\/([^/]+)(?:\/([^/]+))?$/)
     let seoFilter: { provincia: string; municipio?: string } | null = null
 
     if (match) {
