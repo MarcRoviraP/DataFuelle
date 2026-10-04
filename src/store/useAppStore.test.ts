@@ -199,5 +199,36 @@ describe('useAppStore - cost estimation and smart profitability sorting', () => 
     expect(stations[0].isBestOption).toBe(true)
     expect(stations[0].savingsVsNearest).toBeCloseTo(1.82, 1)
   })
+
+  it('assigns correct anchor labels and relative distances for multiple pinned locations', () => {
+    const stationNearOrigin = {
+      ...dummyStationNear,
+      latitud: 40.0,
+      longitud: -3.0
+    }
+    const stationNearHome = {
+      ...dummyStationFar,
+      latitud: 41.5,
+      longitud: 2.0
+    }
+
+    useAppStore.setState({
+      currentLocation: { lat: 40.01, lon: -3.01 }, // Near origin
+      pinnedLocations: [{ id: 'p1', lat: 41.51, lon: 2.01, label: 'Casa (200km)' }],
+      stations: []
+    })
+
+    useAppStore.getState().setStations([stationNearOrigin, stationNearHome])
+    const stations = useAppStore.getState().stations
+
+    const originMatch = stations.find(s => s.idEstacion === dummyStationNear.idEstacion)
+    const homeMatch = stations.find(s => s.idEstacion === dummyStationFar.idEstacion)
+
+    expect(originMatch?.anchorLabel).toBe('Ubicación actual')
+    expect(originMatch?.distancia).toBeLessThan(5)
+
+    expect(homeMatch?.anchorLabel).toBe('Casa (200km)')
+    expect(homeMatch?.distancia).toBeLessThan(5)
+  })
 })
 

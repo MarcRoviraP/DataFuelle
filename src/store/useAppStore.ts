@@ -16,10 +16,21 @@ export interface Car {
   consumo_l_100km: number
 }
 
+export interface PinnedLocation {
+  id: string
+  lat: number
+  lon: number
+  label: string
+}
+
 interface AppState {
   // Location
   currentLocation: { lat: number; lon: number } | null
   setCurrentLocation: (lat: number, lon: number) => void
+  pinnedLocations: PinnedLocation[]
+  addPinnedLocation: (lat: number, lon: number, label?: string) => void
+  removePinnedLocation: (id: string) => void
+  clearPinnedLocations: () => void
 
   // Filters
   radius: number
@@ -140,6 +151,45 @@ export const useAppStore = create<AppState>((set, get) => ({
       localStorage.setItem('datafuelle_current_location', JSON.stringify({ lat, lon }))
     } catch {}
   },
+  pinnedLocations: (() => {
+    try {
+      const stored = localStorage.getItem('datafuelle_pinned_locations')
+      return stored ? JSON.parse(stored) : []
+    } catch {
+      return []
+    }
+  })(),
+  addPinnedLocation: (lat, lon, label) => {
+    const pins = get().pinnedLocations
+    const nextNum = pins.length + 1
+    const newPin: PinnedLocation = {
+      id: `pin-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      lat,
+      lon,
+      label: label || `Chincheta ${nextNum}`
+    }
+    const updated = [...pins, newPin]
+    set({ pinnedLocations: updated })
+    try {
+      localStorage.setItem('datafuelle_pinned_locations', JSON.stringify(updated))
+    } catch {}
+    get().fetchStations()
+  },
+  removePinnedLocation: (id) => {
+    const updated = get().pinnedLocations.filter(p => p.id !== id)
+    set({ pinnedLocations: updated })
+    try {
+      localStorage.setItem('datafuelle_pinned_locations', JSON.stringify(updated))
+    } catch {}
+    get().fetchStations()
+  },
+  clearPinnedLocations: () => {
+    set({ pinnedLocations: [] })
+    try {
+      localStorage.removeItem('datafuelle_pinned_locations')
+    } catch {}
+    get().fetchStations()
+  },
   activeSEOFilter: null,
   setActiveSEOFilter: (filter) => {
     set({ activeSEOFilter: filter })
@@ -247,10 +297,15 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   stations: [],
   setStations: (newStations) => {
-    const { currentLocation, stations: currentStations, priceChanges } = get()
+    const { currentLocation, pinnedLocations, stations: currentStations, priceChanges } = get()
     
     const currentStationsMap = new Map(currentStations.map(s => [s.idEstacion, s]))
     const nextStations = []
+
+    const anchors = [
+      ...(currentLocation ? [{ lat: currentLocation.lat, lon: currentLocation.lon, label: 'Ubicación actual' }] : []),
+      ...pinnedLocations.map(p => ({ lat: p.lat, lon: p.lon, label: p.label }))
+    ]
 
     for (const newS of newStations) {
       const change = priceChanges.get(newS.idEstacion)
@@ -258,9 +313,21 @@ export const useAppStore = create<AppState>((set, get) => ({
       const delta_pct = change ? parseFloat(change.delta_pct) : undefined
       const precioAnterior = change ? parseFloat(change.precioAnterior) : undefined
       
-      const dist = currentLocation 
-        ? calculateDistance(currentLocation.lat, currentLocation.lon, newS.latitud, newS.longitud) 
-        : newS.distancia
+      let dist = newS.distancia
+      let anchorLabel = newS.anchorLabel || 'Ubicación actual'
+      if (anchors.length > 0) {
+        let minDist = Infinity
+        let bestLabel = ''
+        for (const a of anchors) {
+          const d = calculateDistance(a.lat, a.lon, newS.latitud, newS.longitud)
+          if (d < minDist) {
+            minDist = d
+            bestLabel = a.label
+          }
+        }
+        dist = minDist
+        anchorLabel = bestLabel
+      }
 
       const existing = currentStationsMap.get(newS.idEstacion)
       
@@ -269,6 +336,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         existing &&
         existing.precioBase === newS.precioCombustible &&
         existing.distancia === dist &&
+        existing.anchorLabel === anchorLabel &&
         existing.diff === diff
       ) {
         nextStations.push(existing)
@@ -278,6 +346,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       nextStations.push({
         ...newS,
         distancia: dist,
+        anchorLabel,
         precioBase: newS.precioCombustible,
         diff,
         delta_pct,
@@ -421,37 +490,63 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   fetchStations: async () => {
-    const { currentLocation, radius, selectedFuelTypeId, setIsLoading, setStations, setPriceChanges, activeSEOFilter } = get()
+    const { currentLocation, pinnedLocations, radius, selectedFuelTypeId, setIsLoading, setStations, setPriceChanges, activeSEOFilter } = get()
     
-    if (!currentLocation && !activeSEOFilter) return
+    if (!currentLocation && pinnedLocations.length === 0 && !activeSEOFilter) return
 
     setIsLoading(true)
     try {
-      let stationsPromise;
+      const promises: Promise<Station[]>[] = []
+
       if (activeSEOFilter) {
-        stationsPromise = fetchStationsByProvinceOrMunicipality(
-          activeSEOFilter.provincia,
-          activeSEOFilter.municipio || null,
-          selectedFuelTypeId,
-          currentLocation?.lat,
-          currentLocation?.lon
+        promises.push(
+          fetchStationsByProvinceOrMunicipality(
+            activeSEOFilter.provincia,
+            activeSEOFilter.municipio || null,
+            selectedFuelTypeId,
+            currentLocation?.lat,
+            currentLocation?.lon
+          )
         )
       } else {
-        stationsPromise = fetchStationsByRadius(
-          currentLocation!.lat,
-          currentLocation!.lon,
-          radius,
-          selectedFuelTypeId
-        )
+        if (currentLocation) {
+          promises.push(
+            fetchStationsByRadius(
+              currentLocation.lat,
+              currentLocation.lon,
+              radius,
+              selectedFuelTypeId
+            )
+          )
+        }
+        for (const pin of pinnedLocations) {
+          promises.push(
+            fetchStationsByRadius(
+              pin.lat,
+              pin.lon,
+              radius,
+              selectedFuelTypeId
+            )
+          )
+        }
       }
 
-      const [data, priceChanges] = await Promise.all([
-        stationsPromise,
+      const [stationsResults, priceChanges] = await Promise.all([
+        Promise.all(promises),
         fetchRecentPriceChanges(selectedFuelTypeId)
       ])
-      
+
+      const mergedMap = new Map<number, Station>()
+      for (const list of stationsResults) {
+        for (const s of list) {
+          if (!mergedMap.has(s.idEstacion)) {
+            mergedMap.set(s.idEstacion, s)
+          }
+        }
+      }
+
       setPriceChanges(priceChanges)
-      setStations(data)
+      setStations(Array.from(mergedMap.values()))
     } catch (error) {
       console.error('[Store Fetch] Error:', error)
     } finally {

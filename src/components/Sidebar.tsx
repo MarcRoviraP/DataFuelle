@@ -39,6 +39,9 @@ export const Sidebar = () => {
     setVehicleConsumption,
     isRoundTrip,
     setIsRoundTrip,
+    pinnedLocations,
+    removePinnedLocation,
+    clearPinnedLocations,
     userCars,
     selectedCarId,
   } = useAppStore()
@@ -302,6 +305,69 @@ export const Sidebar = () => {
             )}
           </div>
         </section>
+
+        {/* Pinned Comparison Locations */}
+        {pinnedLocations.length > 0 && (
+          <section className="space-y-3 pt-2 border-t border-slate-100 animate-fadeIn">
+            <div className="flex justify-between items-center px-1">
+              <div className="flex items-center gap-2 text-slate-800 font-bold border-l-4 border-amber-500 pl-1">
+                <span>📌</span>
+                <h2>Zonas a comparar ({pinnedLocations.length + 1})</h2>
+              </div>
+              <button
+                onClick={clearPinnedLocations}
+                className="text-[10px] font-black text-red-500 hover:text-red-700 uppercase tracking-tight"
+              >
+                Borrar todas
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between p-3 bg-blue-50/70 rounded-2xl border border-blue-100 text-xs font-bold text-blue-900">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">📍</span>
+                  <div>
+                    <span className="block font-black">Ubicación principal</span>
+                    <span className="text-[10px] text-blue-600 font-semibold">Aquí / Origen</span>
+                  </div>
+                </div>
+                <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-black uppercase">
+                  {radius} km
+                </span>
+              </div>
+
+              {pinnedLocations.map((pin) => (
+                <div
+                  key={pin.id}
+                  className="flex items-center justify-between p-3 bg-amber-50/70 rounded-2xl border border-amber-200 text-xs font-bold text-amber-950"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">📌</span>
+                    <div>
+                      <span className="block font-black">{pin.label}</span>
+                      <span className="text-[10px] text-amber-700 font-semibold">Zona de destino / comparación</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-black uppercase">
+                      {radius} km
+                    </span>
+                    <button
+                      onClick={() => removePinnedLocation(pin.id)}
+                      className="p-1 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                      title="Eliminar chincheta"
+                    >
+                      <X size={15} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-[10px] text-slate-400 font-medium px-1">
+              💡 Mantén pulsado 1s en el mapa para añadir más chinchetas (ej. tu casa a 200km) y comparar precios.
+            </p>
+          </section>
+        )}
 
         {/* Garage Section - Highlighted if logged in */}
         {user && (

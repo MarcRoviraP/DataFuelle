@@ -7,7 +7,7 @@ const { BaseLayer } = LayersControl
 import { useAppStore } from '../store/useAppStore'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, Fragment } from 'react'
 import { LocateFixed, Calendar } from 'lucide-react'
 import { shouldShowLastUpdate, formatLastUpdate } from '../utils/date'
 
@@ -25,49 +25,184 @@ const DefaultIcon = L.icon({
   shadowSize: [41, 41],
 })
 
-// Distinctive location icon — pulsing blue circle via SVG DivIcon
+// Chincheta (pin) icon for active search center
 const LocationIcon = L.divIcon({
   className: '',
   html: `
-    <div style="position:relative;width:36px;height:36px;display:flex;align-items:center;justify-content:center;animation:marker-pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
-      <div style="position:absolute;width:36px;height:36px;border-radius:50%;background:rgba(37,99,235,0.3);animation:pulse 2s ease-out infinite;"></div>
-      <div style="width:18px;height:18px;border-radius:50%;background:#2563eb;border:3px solid #fff;box-shadow:0 2px 12px rgba(37,99,235,0.8);z-index:1;"></div>
+    <div style="position:relative;width:34px;height:44px;display:flex;flex-direction:column;align-items:center;animation:pin-drop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+      <svg width="32" height="42" viewBox="0 0 32 42" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 4px 6px rgba(0,0,0,0.35));">
+        <path d="M16 0C7.16344 0 0 7.16344 0 16C0 27 16 42 16 42C16 42 32 27 32 16C32 7.16344 24.8366 0 16 0Z" fill="#2563eb"/>
+        <circle cx="16" cy="15" r="6" fill="white"/>
+        <circle cx="16" cy="15" r="3" fill="#2563eb"/>
+      </svg>
+      <div style="position:absolute;bottom:0;width:12px;height:4px;background:rgba(0,0,0,0.25);border-radius:50%;filter:blur(1px);transform:translateY(2px);"></div>
     </div>
     <style>
-      @keyframes pulse{0%{transform:scale(0.8);opacity:1}100%{transform:scale(3);opacity:0}}
-      @keyframes marker-pop{0%{transform:scale(0) translateY(-20px);opacity:0}100%{transform:scale(1) translateY(0);opacity:1}}
+      @keyframes pin-drop{0%{transform:scale(0) translateY(-25px);opacity:0}100%{transform:scale(1) translateY(0);opacity:1}}
     </style>
   `,
-  iconSize: [36, 36],
-  iconAnchor: [18, 18],
-  popupAnchor: [0, -20],
+  iconSize: [32, 42],
+  iconAnchor: [16, 42],
+  popupAnchor: [0, -42],
 })
+
+// Distinctive comparison chincheta icon
+const ChinchetaIcon = (label: string) => {
+  const numberText = label.replace(/[^0-9]/g, '') || '•'
+  return L.divIcon({
+    className: '',
+    html: `
+      <div style="position:relative;width:34px;height:44px;display:flex;flex-direction:column;align-items:center;animation:pin-drop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+        <svg width="32" height="42" viewBox="0 0 32 42" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 4px 6px rgba(0,0,0,0.35));">
+          <path d="M16 0C7.16344 0 0 7.16344 0 16C0 27 16 42 16 42C16 42 32 27 32 16C32 7.16344 24.8366 0 16 0Z" fill="#ea580c"/>
+          <circle cx="16" cy="15" r="7" fill="white"/>
+          <text x="16" y="19" font-size="11" font-weight="900" fill="#ea580c" text-anchor="middle">${numberText}</text>
+        </svg>
+        <div style="position:absolute;bottom:0;width:12px;height:4px;background:rgba(0,0,0,0.25);border-radius:50%;filter:blur(1px);transform:translateY(2px);"></div>
+      </div>
+      <style>
+        @keyframes pin-drop{0%{transform:scale(0) translateY(-25px);opacity:0}100%{transform:scale(1) translateY(0);opacity:1}}
+      </style>
+    `,
+    iconSize: [32, 42],
+    iconAnchor: [16, 42],
+    popupAnchor: [0, -42],
+  })
+}
 
 L.Marker.prototype.options.icon = DefaultIcon
 
 const MapEvents = () => {
-  const fetchStations = useAppStore(state => state.fetchStations)
+  const addPinnedLocation = useAppStore(state => state.addPinnedLocation)
+  const currentLocation = useAppStore(state => state.currentLocation)
   const setCurrentLocation = useAppStore(state => state.setCurrentLocation)
   const setSelectedStationId = useAppStore(state => state.setSelectedStationId)
   const selectedStationId = useAppStore(state => state.selectedStationId)
   const map = useMap()
+  const [holdPos, setHoldPos] = useState<{ x: number; y: number } | null>(null)
+
+  useEffect(() => {
+    const container = map.getContainer()
+    let holdTimer: number | null = null
+    let feedbackTimer: number | null = null
+    let startX = 0
+    let startY = 0
+    let didLongPress = false
+
+    const clear = () => {
+      if (holdTimer !== null) {
+        window.clearTimeout(holdTimer)
+        holdTimer = null
+      }
+      if (feedbackTimer !== null) {
+        window.clearTimeout(feedbackTimer)
+        feedbackTimer = null
+      }
+      setHoldPos(null)
+    }
+
+    const onPointerDown = (e: PointerEvent) => {
+      // Only main button (left click or touch)
+      if (e.button !== 0 && e.pointerType === 'mouse') return
+
+      // Don't trigger long press if clicking controls, markers, popups or clusters
+      const target = e.target as HTMLElement
+      if (
+        target.closest('.leaflet-control') ||
+        target.closest('.leaflet-popup') ||
+        target.closest('.leaflet-marker-icon') ||
+        target.closest('.custom-marker-cluster')
+      ) {
+        return
+      }
+
+      startX = e.clientX
+      startY = e.clientY
+      didLongPress = false
+
+      clear()
+
+      // Show visual indicator only if held stationary for 200ms (avoids flicker when dragging)
+      feedbackTimer = window.setTimeout(() => {
+        setHoldPos({ x: e.clientX, y: e.clientY })
+      }, 200)
+
+      // Strict 1-second delay (1000ms) holding stationary before placing pin
+      holdTimer = window.setTimeout(() => {
+        didLongPress = true
+        setHoldPos(null)
+        holdTimer = null
+        if (feedbackTimer !== null) {
+          window.clearTimeout(feedbackTimer)
+          feedbackTimer = null
+        }
+
+        const latlng = map.mouseEventToLatLng(e)
+        if (!currentLocation) {
+          setCurrentLocation(latlng.lat, latlng.lng)
+        } else {
+          addPinnedLocation(latlng.lat, latlng.lng)
+        }
+
+        if ('vibrate' in navigator) {
+          navigator.vibrate?.(50)
+        }
+      }, 1000)
+    }
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (holdTimer === null && feedbackTimer === null) return
+      const dist = Math.hypot(e.clientX - startX, e.clientY - startY)
+      // Cancel immediately if moved more than 6px (dragging or panning map)
+      if (dist > 6) {
+        clear()
+      }
+    }
+
+    const onPointerUp = () => {
+      clear()
+    }
+
+    const onContextMenu = (e: MouseEvent) => {
+      if (didLongPress) {
+        e.preventDefault()
+        didLongPress = false
+      }
+    }
+
+    // Cancel long press immediately if Leaflet starts dragging or zooming
+    map.on('movestart', clear)
+    map.on('dragstart', clear)
+    map.on('zoomstart', clear)
+
+    container.addEventListener('pointerdown', onPointerDown)
+    // Capture phase on window prevents Leaflet from swallowing move events via stopPropagation
+    window.addEventListener('pointermove', onPointerMove, { capture: true, passive: true })
+    window.addEventListener('pointerup', onPointerUp, { capture: true })
+    window.addEventListener('pointercancel', onPointerUp, { capture: true })
+    container.addEventListener('contextmenu', onContextMenu)
+
+    return () => {
+      clear()
+      map.off('movestart', clear)
+      map.off('dragstart', clear)
+      map.off('zoomstart', clear)
+
+      container.removeEventListener('pointerdown', onPointerDown)
+      window.removeEventListener('pointermove', onPointerMove, { capture: true })
+      window.removeEventListener('pointerup', onPointerUp, { capture: true })
+      window.removeEventListener('pointercancel', onPointerUp, { capture: true })
+      container.removeEventListener('contextmenu', onContextMenu)
+    }
+  }, [map, setCurrentLocation, addPinnedLocation, currentLocation])
 
   useMapEvents({
-    click(e) {
+    click() {
       if (selectedStationId) {
         // If a card/popup is open, clicking the map just closes it
         setSelectedStationId(null)
-      } else {
-        // Otherwise, move the search center AND fetch new data
-        setCurrentLocation(e.latlng.lat, e.latlng.lng)
-        fetchStations()
-
-        try {
-          localStorage.setItem('datafuelle_map_center', JSON.stringify({ lat: e.latlng.lat, lng: e.latlng.lng }))
-        } catch (err) {
-          console.error(err)
-        }
       }
+      // Clicking does NOT change the location anymore
     },
     moveend() {
       const center = map.getCenter()
@@ -95,7 +230,45 @@ const MapEvents = () => {
       }
     }
   })
-  return null
+
+  return holdPos ? (
+    <div
+      style={{
+        position: 'fixed',
+        left: holdPos.x - 22,
+        top: holdPos.y - 22,
+        width: 44,
+        height: 44,
+        pointerEvents: 'none',
+        zIndex: 9999,
+      }}
+    >
+      <svg width="44" height="44" viewBox="0 0 44 44">
+        <circle cx="22" cy="22" r="18" fill="rgba(37,99,235,0.18)" stroke="#cbd5e1" strokeWidth="3" />
+        <circle
+          cx="22"
+          cy="22"
+          r="18"
+          fill="none"
+          stroke="#2563eb"
+          strokeWidth="3.5"
+          strokeDasharray="113"
+          strokeDashoffset="113"
+          style={{
+            animation: 'hold-fill 0.8s linear forwards',
+            transform: 'rotate(-90deg)',
+            transformOrigin: 'center',
+          }}
+        />
+      </svg>
+      <style>{`
+        @keyframes hold-fill {
+          from { stroke-dashoffset: 113; }
+          to { stroke-dashoffset: 0; }
+        }
+      `}</style>
+    </div>
+  ) : null
 }
 
 
@@ -186,7 +359,7 @@ const cartoKey = import.meta.env.CARTO_MAPS_KEY || import.meta.env.VITE_CARTO_MA
 const cartoKeyParam = cartoKey ? `?key=${cartoKey}` : ''
 
 export const MapView = () => {
-  const { filteredStations, currentLocation, selectedFuelTypeId, selectedStationId, stationDiscounts, radius, isLoading, favoriteStationIds, routeCoordinates, routeInfo, clearRoute, refuelLiters } = useAppStore()
+  const { filteredStations, currentLocation, pinnedLocations, removePinnedLocation, selectedFuelTypeId, selectedStationId, stationDiscounts, radius, isLoading, favoriteStationIds, routeCoordinates, routeInfo, clearRoute, refuelLiters } = useAppStore()
   const [visualRadius, setVisualRadius] = useState<number>(0)
   const defaultCenter: [number, number] = [39.4699, -0.3763]
   const markerRefs = useRef<Map<number, L.Marker>>(new Map())
@@ -470,6 +643,57 @@ export const MapView = () => {
             )}
           </>
         )}
+
+        {pinnedLocations.map((pin) => (
+          <Fragment key={pin.id}>
+            <Marker
+              position={[pin.lat, pin.lon]}
+              icon={ChinchetaIcon(pin.label)}
+              zIndexOffset={1002}
+            >
+              <Popup minWidth={180}>
+                <div style={{ padding: '6px', textAlign: 'center' }}>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#0f172a' }}>
+                    📌 {pin.label}
+                  </h4>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '11px', color: '#64748b' }}>
+                    Radio escaneado: <strong>{radius} km</strong>
+                  </p>
+                  <button
+                    onClick={() => removePinnedLocation(pin.id)}
+                    style={{
+                      background: '#fee2e2',
+                      color: '#dc2626',
+                      border: '1px solid #fecaca',
+                      borderRadius: '8px',
+                      padding: '6px 12px',
+                      fontSize: '11px',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      width: '100%',
+                    }}
+                  >
+                    🗑️ Quitar esta chincheta
+                  </button>
+                </div>
+              </Popup>
+            </Marker>
+
+            <Circle
+              center={[pin.lat, pin.lon]}
+              radius={radius * 1000}
+              pathOptions={{
+                fillColor: '#f97316',
+                fillOpacity: 0.08,
+                color: '#ea580c',
+                weight: 2,
+                dashArray: '6, 6',
+                opacity: 0.8,
+              }}
+              key={`circle-pin-${pin.id}`}
+            />
+          </Fragment>
+        ))}
 
         {routeCoordinates && (
           <>

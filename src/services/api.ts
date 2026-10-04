@@ -35,6 +35,7 @@ export interface Station {
   refuelCost?: number
   isBestOption?: boolean
   savingsVsNearest?: number
+  anchorLabel?: string
 }
 
 const MITECO_URL = 'https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestres/'

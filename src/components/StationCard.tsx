@@ -232,7 +232,18 @@ export const StationCard = memo(({ station, isSelected, onClick }: StationCardPr
               className={isFav ? "text-red-500 fill-red-500 animate-in zoom-in duration-300" : "text-slate-300 hover:text-red-400"} 
             />
           </button>
-          <h3 className="font-bold text-gray-900 leading-tight line-clamp-3 overflow-hidden text-xs uppercase">{station.nombreEstacion}</h3>
+          <div className="flex flex-col min-w-0">
+            <h3 className="font-bold text-gray-900 leading-tight line-clamp-3 overflow-hidden text-xs uppercase">{station.nombreEstacion}</h3>
+            {station.anchorLabel && (
+              <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded tracking-wide w-max mt-1 ${
+                station.anchorLabel === 'Ubicación actual'
+                  ? 'bg-blue-50 text-blue-700 border border-blue-100'
+                  : 'bg-amber-50 text-amber-800 border border-amber-200'
+              }`}>
+                {station.anchorLabel === 'Ubicación actual' ? '📍' : '📌'} {station.anchorLabel}
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex flex-col items-end">
           <div className="flex items-baseline gap-1.5 flex-wrap justify-end">
