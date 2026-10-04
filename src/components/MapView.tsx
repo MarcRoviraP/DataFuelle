@@ -182,6 +182,9 @@ const LocateMeButton = () => {
 const fmt = (v: number | null | undefined) =>
   v && v > 0 ? `${v.toFixed(3)} €/L` : '—'
 
+const cartoKey = import.meta.env.CARTO_MAPS_KEY || import.meta.env.VITE_CARTO_MAPS_KEY || ''
+const cartoKeyParam = cartoKey ? `?key=${cartoKey}` : ''
+
 export const MapView = () => {
   const { filteredStations, currentLocation, selectedFuelTypeId, selectedStationId, stationDiscounts, radius, isLoading, favoriteStationIds, routeCoordinates, routeInfo, clearRoute } = useAppStore()
   const [visualRadius, setVisualRadius] = useState<number>(0)
@@ -407,13 +410,13 @@ export const MapView = () => {
           <BaseLayer checked={activeLayer === 'Callejero'} name="Callejero">
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-              url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+              url={`https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png${cartoKeyParam}`}
             />
           </BaseLayer>
           <BaseLayer checked={activeLayer === 'Oscuro'} name="Oscuro">
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-              url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+              url={`https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png${cartoKeyParam}`}
             />
           </BaseLayer>
           <BaseLayer checked={activeLayer === 'Satélite'} name="Satélite">
