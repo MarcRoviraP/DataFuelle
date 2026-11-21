@@ -59,23 +59,19 @@ Deno.serve(async (req: Request) => {
       const chunk = stationsList.slice(i, i + CHUNK_SIZE);
       const chunkStationIds = chunk.map((s: any) => parseInt(s.IDEESS)).filter(Boolean);
 
-      // 1. Get latest history for comparison
-      const { data: latestRecords } = await supabase
-        .from("price_history")
-        .select("station_id, price_95, price_98, price_diesel")
-        .in("station_id", chunkStationIds)
-        .order("station_id")
-        .order("recorded_at", { ascending: false });
+      // 1. Get latest known prices from `stations` (1 row per station, avoids 1000-row PostgREST cap)
+      const { data: latestStations } = await supabase
+        .from("stations")
+        .select("external_id, last_price_95, last_price_98, last_price_diesel")
+        .in("external_id", chunkStationIds);
 
-      const latestMap = new Map();
-      latestRecords?.forEach(r => {
-        if (!latestMap.has(r.station_id)) {
-          latestMap.set(r.station_id, {
-            p95: Number(r.price_95),
-            p98: Number(r.price_98),
-            pD: Number(r.price_diesel)
-          });
-        }
+      const latestMap = new Map<number, { p95: number; p98: number; pD: number }>();
+      latestStations?.forEach(r => {
+        latestMap.set(r.external_id, {
+          p95: Number(r.last_price_95 ?? 0),
+          p98: Number(r.last_price_98 ?? 0),
+          pD: Number(r.last_price_diesel ?? 0)
+        });
       });
 
       // 2. Prepare Station Metadata + Current Prices

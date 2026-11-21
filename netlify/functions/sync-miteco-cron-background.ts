@@ -76,29 +76,26 @@ export const handler = async (_event: any) => {
       const chunk = stationsList.slice(i, i + CHUNK_SIZE);
       const chunkStationIds = chunk.map((s: any) => parseInt(s.IDEESS)).filter(Boolean);
 
-      // Get latest prices for change detection
-      const { data: latestRecords, error: fetchError } = await supabase
-        .from('price_history')
-        .select('station_id, price_95, price_98, price_diesel')
-        .in('station_id', chunkStationIds)
-        .order('station_id')
-        .order('recorded_at', { ascending: false });
+      // Get latest known prices from `stations` (1 row per station, never hits PostgREST 1000-row limit
+      // and stays accurate even after old `price_history` rows are archived to Storage).
+      const { data: latestStations, error: fetchError } = await supabase
+        .from('stations')
+        .select('external_id, last_price_95, last_price_98, last_price_diesel')
+        .in('external_id', chunkStationIds);
 
       if (fetchError) {
-        console.error(`  ❌ Error fetching history for chunk ${chunkNum}:`, fetchError.message);
+        console.error(`  ❌ Error fetching current station prices for chunk ${chunkNum}:`, fetchError.message);
         continue;
       }
 
       // Build map of last known prices per station
       const latestMap = new Map<number, { p95: number; p98: number; pD: number }>();
-      latestRecords?.forEach(r => {
-        if (!latestMap.has(r.station_id)) {
-          latestMap.set(r.station_id, {
-            p95: Number(r.price_95),
-            p98: Number(r.price_98),
-            pD: Number(r.price_diesel)
-          });
-        }
+      latestStations?.forEach(r => {
+        latestMap.set(r.external_id, {
+          p95: Number(r.last_price_95 ?? 0),
+          p98: Number(r.last_price_98 ?? 0),
+          pD: Number(r.last_price_diesel ?? 0)
+        });
       });
 
       // Upsert station metadata
